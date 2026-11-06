@@ -11,9 +11,11 @@
     var DEFAULT_RPC = 'https://ethereum-rpc.publicnode.com';
     var PREFS_KEY = 'find3r.preferences.v1';
 
-    // The Settings toggle; on unless the stored preferences say names: false.
+    // The Settings toggle: app.js answers for the live preferences where it is loaded (they may live only in
+    // memory on a shared gateway origin); elsewhere the stored preferences; on unless they say names: false.
     function enabled() {
         try {
+            if (typeof window.find3rNamesEnabled === 'function') return !!window.find3rNamesEnabled();
             var p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
             return !(p && p.names === false);
         } catch (e) { return true; }
@@ -98,8 +100,10 @@
         }).catch(function () { return null; });
     }
 
+    // Queued lookups wait while the switch is off and resume when it comes back on; a lookup already sent
+    // finishes, and its result is kept (never recorded as "no name" because of the switch).
     function pump() {
-        while (active < IN_FLIGHT && queue.length) {
+        while (enabled() && active < IN_FLIGHT && queue.length) {
             var job = queue.shift();
             active++;
             lookup(job.addr).then(job.done, function () { job.done(null); }).then(function () { active--; pump(); });
@@ -142,7 +146,8 @@
         }
         if (existing) return;
         nameFor(addr).then(function (name) {
-            if (!name || el.dataset.f3rName !== addr || el.querySelector(':scope > .f3r-name')) return;
+            // A lookup that started before the switch was turned off must not add its label afterwards.
+            if (!name || !enabled() || el.dataset.f3rName !== addr || el.querySelector(':scope > .f3r-name')) return;
             var s = document.createElement('span');
             s.className = 'f3r-name';
             s.textContent = ' · ' + name;
@@ -163,6 +168,7 @@
             document.querySelectorAll('.f3r-name').forEach(function (s) { s.remove(); });
             return;
         }
+        pump();
         // Artwork details: owner and artist addresses, never contract addresses.
         document.querySelectorAll('dd').forEach(function (dd) {
             var t = ownText(dd), dt = dd.previousElementSibling;
@@ -192,6 +198,8 @@
         addEventListener('hashchange', later);
         // Settings is a dialog; closing it after a save re-applies the toggle even when nothing else re-rendered.
         document.addEventListener('close', later, true);
+        // A switch saved in another tab of this origin reaches this page through the storage event.
+        addEventListener('storage', function (e) { if (!e.key || e.key === PREFS_KEY) later(); });
         later();
     }
     if (document.body) start(); else addEventListener('DOMContentLoaded', start);

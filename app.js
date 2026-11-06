@@ -4499,6 +4499,7 @@ const crossVisit = {
       tx.objectStore("lists").clear();
       tx.objectStore("names").clear();
     });
+    resetClassChecks();
   },
 };
 globalThis.find3rNameCache = { get: (addr) => crossVisit.name(addr), put: (addr, name) => crossVisit.putName(addr, name) };
@@ -5610,7 +5611,13 @@ const CLASS_PROBES = [
     Oe({ abi: ve([gt]), functionName: "supportsInterface", args: ["0xd9b67a26"] }),
   ],
   CLASS_CHECK_BATCH = 10,
-  verifiedClasses = new Set();
+  verifiedClasses = new Set(),
+  verifyFailed = new Set();
+// Forgotten when the viewer changes Settings or clears local copies.
+function resetClassChecks() {
+  verifiedClasses.clear();
+  verifyFailed.clear();
+}
 function probedBool(c) {
   return !!c?.success && /^0x0{63}1$/i.test(String(c.returnData));
 }
@@ -5629,6 +5636,11 @@ function probedClass([version, is721, is1155]) {
 async function verifyClasses(rpc, chainId, known) {
   const pending = [...known.keys()].filter((c) => !verifiedClasses.has(Number(chainId) + ":" + c));
   if (!pending.length) return known;
+  // No Multicall3 on this chain, or the check already failed this session: the cache stays unused.
+  if (!MULTICALL3_CHAINS.has(Number(chainId)) || verifyFailed.has(Number(chainId))) {
+    for (const c of pending) known.delete(c);
+    return known;
+  }
   const stale = [];
   for (let a = 0; a < pending.length; a += CLASS_CHECK_BATCH) {
     const batch = pending.slice(a, a + CLASS_CHECK_BATCH);
@@ -5642,8 +5654,9 @@ async function verifyClasses(rpc, chainId, known) {
       );
       if (!Array.isArray(res) || res.length !== batch.length * CLASS_PROBES.length) throw Error("Incomplete class checks.");
     } catch {
-      for (const c of batch) known.delete(c);
-      continue;
+      verifyFailed.add(Number(chainId));
+      for (const c of pending.slice(a)) known.delete(c);
+      break;
     }
     batch.forEach((c, i) => {
       const live = probedClass(res.slice(i * CLASS_PROBES.length, (i + 1) * CLASS_PROBES.length)),
@@ -5656,7 +5669,8 @@ async function verifyClasses(rpc, chainId, known) {
       stale.push(c);
     });
   }
-  stale.length && crossVisit.deleteClasses(chainId, stale);
+  // Awaited so the delete cannot land after the live path has stored the fresh class.
+  if (stale.length) await crossVisit.deleteClasses(chainId, stale);
   return known;
 }
 async function Pd(e, t, r) {
@@ -5677,9 +5691,10 @@ async function Pd(e, t, r) {
     v = c > 0n ? Number(c) : 0,
     name = typeof s == "string" && s ? s.slice(0, 160) : void 0;
   d &&
-    crossVisit.putClasses(t, [
+    (crossVisit.putClasses(t, [
       [r, { standard: d, ...(name ? { name } : {}), ...(v ? { abxVersion: v } : {}) }],
-    ]);
+    ]),
+    verifiedClasses.add(Number(t) + ":" + r));
   return collectionClass(t, r, d, s, v);
 }
 function collectionClass(t, r, d, s, v) {
@@ -6100,6 +6115,7 @@ var Te = (e) => e.chainId + ":" + e.contract.toLowerCase(),
                   this.checked.set(Te(x), { until: Date.now() + 6e4, value: H }));
               }
               crossVisit.putClasses(v, keep);
+              for (const [c] of keep) verifiedClasses.add(Number(v) + ":" + c.toLowerCase());
             } catch {
               w += $.length;
             }
@@ -6421,6 +6437,8 @@ var p = (e) => document.querySelector(e),
   Be = dt(new URL(location.href)),
   $s = !!globalThis.__find3rLocation,
   I = Ra(Be ? { getItem: () => null } : void 0);
+// names.js asks this first, so the switch also works where preferences live only in memory.
+globalThis.find3rNamesEnabled = () => I.names !== !1;
 Be &&
   ((p(".sidebar-note").textContent = "Temporary folders on this shared gateway. Self-host for private settings."),
   (p("#settings-form>p").textContent =
@@ -6569,7 +6587,10 @@ function Fd() {
 }
 // A saved wallet whose label is just its address (full or shortened): names.js may append its ENS name.
 function unlabeledWallet(r) {
-  return r.kind === "wallet" && /^0x[0-9a-f]{40}$/i.test(r.value || "") && (!r.label || r.label === r.value || r.label === Nd(r.value));
+  // A label that is the address in any letter case is still "no label of its own".
+  const label = String(r.label || "").toLowerCase(),
+    value = String(r.value || "").toLowerCase();
+  return r.kind === "wallet" && /^0x[0-9a-f]{40}$/.test(value) && (!label || label === value || label === Nd(value));
 }
 function cr() {
   let e = (t) =>
@@ -7663,6 +7684,7 @@ p("#settings-form").addEventListener("submit", (e) => {
       bt.clear(),
       ir.clear(),
       sr.clear(),
+      resetClassChecks(),
       (I.rpc = r),
       (I.loading = t.get("loading") === "all" ? "all" : "needed"),
       (p("#connection-setup").hidden = !0),
