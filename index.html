@@ -10,6 +10,8 @@
     <title>find3r — an onchain file browser</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./app.css" />
+    <link rel="stylesheet" href="./theme-dark.css" />
+    <script src="./theme.js"></script>
     <link rel="help" href="./AGENTS.md" type="text/markdown" title="Agent recovery guide" />
     <link rel="alternate" href="./llms.txt" type="text/plain" title="For agents" />
     <script src="./keccak.js"></script>
@@ -21,6 +23,7 @@
     <header class="desktop-header">
       <a class="wordmark" href="./">find<span>3</span>r<span class="dot">.</span></a
       ><span>A little window into the onchain web.</span><a href="./learn.html">How it works ↗</a>
+    <button type="button" id="theme-toggle"></button>
     </header>
     <main class="window" aria-label="Onchain file browser">
       <div class="titlebar">

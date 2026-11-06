@@ -1,0 +1,641 @@
+/* Dark theme for the thebenmeadows.com look: html.dark, or a dark system unless html.light. */
+html.dark {
+  color-scheme: dark;
+  --paper: #000000;
+  --panel: #09090b;
+  --ink: #d4d4d4;
+  --muted: #737373;
+  --line: #27272a;
+  --blue: #a3a3a3;
+  --selected: #09090b;
+  background-color: #09090b;
+}
+html.dark button {
+  border-color: #27272a;
+}
+html.dark button:hover {
+  background-color: #000000;
+  border-color: #52525b;
+}
+html.dark input:focus,
+html.dark textarea:focus {
+  outline-color: #a3a3a360;
+}
+html.dark .primary {
+  color: #000000;
+}
+html.dark .primary:hover {
+  background-color: #a3a3a3;
+  border-color: #a3a3a3;
+}
+html.dark .desktop-header > span {
+  color: #737373;
+}
+html.dark .desktop-footer {
+  color: #737373;
+}
+html.dark .window {
+  border-color: #52525b;
+}
+html.dark .titlebar {
+  background: repeating-linear-gradient(0deg, #09090b 0, #09090b 2px, #000000 2px, #000000 4px);
+}
+html.dark .window-mark {
+  border-color: #a3a3a3;
+  background-color: #000000;
+}
+html.dark .title-note {
+  color: #737373;
+}
+html.dark #connection i {
+  background-color: #27272a;
+}
+html.dark #connection.live i {
+  background-color: #737373;
+}
+html.dark .addressbar input {
+  border-color: #18181b;
+  background-color: #000000;
+}
+html.dark aside {
+  background-color: #09090b;
+}
+html.dark #folders > button[aria-current="true"] {
+  background-color: #09090b;
+  color: #d4d4d4;
+}
+html.dark .sidebar-add {
+  color: #737373;
+}
+html.dark .sidebar-note {
+  color: #737373;
+}
+html.dark .sidebar-bottom {
+  color: #737373;
+}
+html.dark .sidebar-bottom strong {
+  color: #a3a3a3;
+}
+html.dark .small-drive {
+  color: #52525b;
+}
+html.dark .welcome {
+  background: linear-gradient(110deg, #000000, #000000);
+  border-bottom-color: #09090b;
+}
+html.dark .eyebrow {
+  color: #737373;
+}
+html.dark .welcome p {
+  color: #737373;
+}
+html.dark .welcome-foot {
+  color: #52525b;
+}
+html.dark .list-head {
+  background-color: #09090b;
+  border-bottom-color: #18181b;
+  color: #737373;
+}
+html.dark .item {
+  border-bottom-color: #09090b;
+}
+html.dark .item:hover {
+  background-color: #000000;
+}
+html.dark .item-type,
+html.dark .item-meta {
+  color: #737373;
+}
+html.dark .empty {
+  color: #737373;
+}
+html.dark .empty.error {
+  color: #a3a3a3;
+}
+html.dark .grid .item[aria-pressed="true"] {
+  border-color: #18181b;
+}
+html.dark .inspector {
+  background-color: #000000;
+}
+html.dark .statusbar {
+  color: #737373;
+}
+html.dark .statusbar .error {
+  color: #a3a3a3;
+}
+html.dark .error {
+  color: #a3a3a3;
+}
+html.dark dialog {
+  border-color: #52525b;
+}
+html.dark dialog::backdrop {
+  background-color: #d4d4d450;
+}
+html.dark .manage-row {
+  border-bottom-color: #09090b;
+}
+html.dark .agent-dialog pre {
+  background-color: #09090b;
+}
+html.dark .viewer-error {
+  color: #a3a3a3;
+}
+html.dark .learn p,
+html.dark .learn li {
+  color: #a3a3a3;
+}
+html.dark .learn code {
+  background-color: #09090b;
+}
+html.dark .learn pre {
+  border-color: #18181b;
+  background-color: #09090b;
+}
+html.dark .learn-links a {
+  border-color: #18181b;
+}
+html.dark .source-note {
+  color: #737373;
+  background-color: #000000;
+  border-bottom-color: #09090b;
+}
+html.dark .item-name .item-art {
+  background-color: #09090b;
+  border-color: #09090b;
+}
+html.dark .item-art-fallback {
+  background-color: #09090b;
+  color: #52525b;
+  border-color: #18181b;
+}
+html.dark .simple .item-type {
+  color: #737373;
+}
+html.dark .artwork-image-button {
+  border-color: #09090b;
+  background-color: #000000;
+}
+html.dark .artwork-image-button:hover {
+  background-color: #000000;
+  border-color: #27272a;
+}
+html.dark .artwork-info {
+  border-left-color: #09090b;
+}
+html.dark .artwork-artist {
+  color: #737373;
+}
+html.dark .button-link:hover {
+  background-color: #a3a3a3;
+}
+html.dark .artwork-features {
+  border-top-color: #09090b;
+}
+html.dark .feature-list > div {
+  border-color: #09090b;
+  background-color: #000000;
+}
+html.dark .feature-list dt {
+  color: #737373;
+}
+html.dark .artwork-about > p {
+  color: #737373;
+}
+html.dark .artwork-details {
+  border-top-color: #09090b;
+}
+html.dark .artwork-details dd {
+  color: #a3a3a3;
+}
+html.dark .independent-link {
+  color: #737373;
+}
+html.dark .artwork-notice {
+  background-color: #000000;
+  border-color: #09090b;
+  color: #737373;
+}
+html.dark .image-dialog {
+  background-color: #e4e4e7;
+  color: #09090b;
+}
+html.dark .image-dialog::backdrop {
+  background-color: #e4e4e7;
+}
+html.dark .image-dialog-bar {
+  background-color: #e4e4e7;
+  border-bottom-color: #d4d4d4;
+}
+html.dark .image-dialog-bar button {
+  background-color: #d4d4d4;
+  color: #09090b;
+  border-color: #a3a3a3;
+}
+@media (max-width: 760px) {
+  html.dark .artwork-info {
+    border-top-color: #09090b;
+  }
+}
+html.dark .library-tools {
+  border-bottom-color: #09090b;
+}
+html.dark .library-tools nav button[aria-pressed="true"] {
+  background-color: #a3a3a3;
+  color: #000000;
+  border-color: #a3a3a3;
+}
+html.dark .library-tools input {
+  background-color: #000000;
+  border-color: #18181b;
+}
+html.dark .item-art-fallback {
+  background-color: #09090b;
+}
+html.dark .gateway-setup form {
+  background-color: #000000;
+  border-color: #18181b;
+}
+html.dark .gateway-setup input {
+  background-color: #000000;
+  border-color: #18181b;
+}
+html.dark .gateway-setup small {
+  color: #737373;
+}
+html.dark .learn details {
+  border-top-color: #09090b;
+}
+html.dark .learn details summary {
+  color: #a3a3a3;
+}
+html.dark .learn .guide-note {
+  border-left-color: #18181b;
+}
+html.dark .live-art-body {
+  background-color: #000000;
+}
+html.dark .live-art-frame {
+  background-color: #000000;
+}
+html.dark .live-back {
+  background-color: #000000f0;
+  color: #e4e4e7;
+}
+html.dark .live-art-notice {
+  background-color: #000000;
+}
+html.dark .vessel-window nav {
+  border-bottom-color: #09090b;
+}
+html.dark .vessel-pixels {
+  background-color: #09090b;
+  border-color: #18181b;
+}
+html.dark .artwork-media pre {
+  background-color: #000000;
+}
+html.dark .async-dialog {
+  background-color: #000000;
+}
+html.dark .async-dialog::backdrop {
+  background-color: #e4e4e7cc;
+}
+html.dark .async-dialog .image-dialog-bar {
+  color: #000000;
+}
+html.dark #async-stage {
+  background-color: #09090b;
+}
+html.dark .primary,
+html.dark .primary:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+}
+html.dark #theme-toggle::before {
+  content: "Light";
+}
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    color-scheme: dark;
+    --paper: #000000;
+    --panel: #09090b;
+    --ink: #d4d4d4;
+    --muted: #737373;
+    --line: #27272a;
+    --blue: #a3a3a3;
+    --selected: #09090b;
+    background-color: #09090b;
+  }
+  html:not(.light) button {
+    border-color: #27272a;
+  }
+  html:not(.light) button:hover {
+    background-color: #000000;
+    border-color: #52525b;
+  }
+  html:not(.light) input:focus,
+  html:not(.light) textarea:focus {
+    outline-color: #a3a3a360;
+  }
+  html:not(.light) .primary {
+    color: #000000;
+  }
+  html:not(.light) .primary:hover {
+    background-color: #a3a3a3;
+    border-color: #a3a3a3;
+  }
+  html:not(.light) .desktop-header > span {
+    color: #737373;
+  }
+  html:not(.light) .desktop-footer {
+    color: #737373;
+  }
+  html:not(.light) .window {
+    border-color: #52525b;
+  }
+  html:not(.light) .titlebar {
+    background: repeating-linear-gradient(0deg, #09090b 0, #09090b 2px, #000000 2px, #000000 4px);
+  }
+  html:not(.light) .window-mark {
+    border-color: #a3a3a3;
+    background-color: #000000;
+  }
+  html:not(.light) .title-note {
+    color: #737373;
+  }
+  html:not(.light) #connection i {
+    background-color: #27272a;
+  }
+  html:not(.light) #connection.live i {
+    background-color: #737373;
+  }
+  html:not(.light) .addressbar input {
+    border-color: #18181b;
+    background-color: #000000;
+  }
+  html:not(.light) aside {
+    background-color: #09090b;
+  }
+  html:not(.light) #folders > button[aria-current="true"] {
+    background-color: #09090b;
+    color: #d4d4d4;
+  }
+  html:not(.light) .sidebar-add {
+    color: #737373;
+  }
+  html:not(.light) .sidebar-note {
+    color: #737373;
+  }
+  html:not(.light) .sidebar-bottom {
+    color: #737373;
+  }
+  html:not(.light) .sidebar-bottom strong {
+    color: #a3a3a3;
+  }
+  html:not(.light) .small-drive {
+    color: #52525b;
+  }
+  html:not(.light) .welcome {
+    background: linear-gradient(110deg, #000000, #000000);
+    border-bottom-color: #09090b;
+  }
+  html:not(.light) .eyebrow {
+    color: #737373;
+  }
+  html:not(.light) .welcome p {
+    color: #737373;
+  }
+  html:not(.light) .welcome-foot {
+    color: #52525b;
+  }
+  html:not(.light) .list-head {
+    background-color: #09090b;
+    border-bottom-color: #18181b;
+    color: #737373;
+  }
+  html:not(.light) .item {
+    border-bottom-color: #09090b;
+  }
+  html:not(.light) .item:hover {
+    background-color: #000000;
+  }
+  html:not(.light) .item-type,
+  html:not(.light) .item-meta {
+    color: #737373;
+  }
+  html:not(.light) .empty {
+    color: #737373;
+  }
+  html:not(.light) .empty.error {
+    color: #a3a3a3;
+  }
+  html:not(.light) .grid .item[aria-pressed="true"] {
+    border-color: #18181b;
+  }
+  html:not(.light) .inspector {
+    background-color: #000000;
+  }
+  html:not(.light) .statusbar {
+    color: #737373;
+  }
+  html:not(.light) .statusbar .error {
+    color: #a3a3a3;
+  }
+  html:not(.light) .error {
+    color: #a3a3a3;
+  }
+  html:not(.light) dialog {
+    border-color: #52525b;
+  }
+  html:not(.light) dialog::backdrop {
+    background-color: #d4d4d450;
+  }
+  html:not(.light) .manage-row {
+    border-bottom-color: #09090b;
+  }
+  html:not(.light) .agent-dialog pre {
+    background-color: #09090b;
+  }
+  html:not(.light) .viewer-error {
+    color: #a3a3a3;
+  }
+  html:not(.light) .learn p,
+  html:not(.light) .learn li {
+    color: #a3a3a3;
+  }
+  html:not(.light) .learn code {
+    background-color: #09090b;
+  }
+  html:not(.light) .learn pre {
+    border-color: #18181b;
+    background-color: #09090b;
+  }
+  html:not(.light) .learn-links a {
+    border-color: #18181b;
+  }
+  html:not(.light) .source-note {
+    color: #737373;
+    background-color: #000000;
+    border-bottom-color: #09090b;
+  }
+  html:not(.light) .item-name .item-art {
+    background-color: #09090b;
+    border-color: #09090b;
+  }
+  html:not(.light) .item-art-fallback {
+    background-color: #09090b;
+    color: #52525b;
+    border-color: #18181b;
+  }
+  html:not(.light) .simple .item-type {
+    color: #737373;
+  }
+  html:not(.light) .artwork-image-button {
+    border-color: #09090b;
+    background-color: #000000;
+  }
+  html:not(.light) .artwork-image-button:hover {
+    background-color: #000000;
+    border-color: #27272a;
+  }
+  html:not(.light) .artwork-info {
+    border-left-color: #09090b;
+  }
+  html:not(.light) .artwork-artist {
+    color: #737373;
+  }
+  html:not(.light) .button-link:hover {
+    background-color: #a3a3a3;
+  }
+  html:not(.light) .artwork-features {
+    border-top-color: #09090b;
+  }
+  html:not(.light) .feature-list > div {
+    border-color: #09090b;
+    background-color: #000000;
+  }
+  html:not(.light) .feature-list dt {
+    color: #737373;
+  }
+  html:not(.light) .artwork-about > p {
+    color: #737373;
+  }
+  html:not(.light) .artwork-details {
+    border-top-color: #09090b;
+  }
+  html:not(.light) .artwork-details dd {
+    color: #a3a3a3;
+  }
+  html:not(.light) .independent-link {
+    color: #737373;
+  }
+  html:not(.light) .artwork-notice {
+    background-color: #000000;
+    border-color: #09090b;
+    color: #737373;
+  }
+  html:not(.light) .image-dialog {
+    background-color: #e4e4e7;
+    color: #09090b;
+  }
+  html:not(.light) .image-dialog::backdrop {
+    background-color: #e4e4e7;
+  }
+  html:not(.light) .image-dialog-bar {
+    background-color: #e4e4e7;
+    border-bottom-color: #d4d4d4;
+  }
+  html:not(.light) .image-dialog-bar button {
+    background-color: #d4d4d4;
+    color: #09090b;
+    border-color: #a3a3a3;
+  }
+  @media (max-width: 760px) {
+    html:not(.light) .artwork-info {
+      border-top-color: #09090b;
+    }
+  }
+  html:not(.light) .library-tools {
+    border-bottom-color: #09090b;
+  }
+  html:not(.light) .library-tools nav button[aria-pressed="true"] {
+    background-color: #a3a3a3;
+    color: #000000;
+    border-color: #a3a3a3;
+  }
+  html:not(.light) .library-tools input {
+    background-color: #000000;
+    border-color: #18181b;
+  }
+  html:not(.light) .item-art-fallback {
+    background-color: #09090b;
+  }
+  html:not(.light) .gateway-setup form {
+    background-color: #000000;
+    border-color: #18181b;
+  }
+  html:not(.light) .gateway-setup input {
+    background-color: #000000;
+    border-color: #18181b;
+  }
+  html:not(.light) .gateway-setup small {
+    color: #737373;
+  }
+  html:not(.light) .learn details {
+    border-top-color: #09090b;
+  }
+  html:not(.light) .learn details summary {
+    color: #a3a3a3;
+  }
+  html:not(.light) .learn .guide-note {
+    border-left-color: #18181b;
+  }
+  html:not(.light) .live-art-body {
+    background-color: #000000;
+  }
+  html:not(.light) .live-art-frame {
+    background-color: #000000;
+  }
+  html:not(.light) .live-back {
+    background-color: #000000f0;
+    color: #e4e4e7;
+  }
+  html:not(.light) .live-art-notice {
+    background-color: #000000;
+  }
+  html:not(.light) .vessel-window nav {
+    border-bottom-color: #09090b;
+  }
+  html:not(.light) .vessel-pixels {
+    background-color: #09090b;
+    border-color: #18181b;
+  }
+  html:not(.light) .artwork-media pre {
+    background-color: #000000;
+  }
+  html:not(.light) .async-dialog {
+    background-color: #000000;
+  }
+  html:not(.light) .async-dialog::backdrop {
+    background-color: #e4e4e7cc;
+  }
+  html:not(.light) .async-dialog .image-dialog-bar {
+    color: #000000;
+  }
+  html:not(.light) #async-stage {
+    background-color: #09090b;
+  }
+  html:not(.light) .primary,
+  html:not(.light) .primary:hover {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: #000000;
+  }
+  html:not(.light) #theme-toggle::before {
+    content: "Light";
+  }
+}
