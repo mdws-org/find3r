@@ -3,11 +3,21 @@
    A name is the address's primary name (ENSIP-19, through the Universal Resolver in ens.js,
    offchain names included) and is shown only when it resolves forward to the same address,
    so a reverse record cannot claim someone else's name. Lookups use the Ethereum RPC from
-   find3r's Settings when one is set, else the public default. This only appends a label;
+   find3r's Settings when one is set, else the public default. Settings can turn the labels
+   off ("Show ENS names next to addresses"); off removes the labels and stops the lookups,
+   while a name typed into the address box still resolves. This only appends a label;
    find3r's own text and links are untouched. */
 (function () {
     var DEFAULT_RPC = 'https://ethereum-rpc.publicnode.com';
     var PREFS_KEY = 'find3r.preferences.v1';
+
+    // The Settings toggle; on unless the stored preferences say names: false.
+    function enabled() {
+        try {
+            var p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+            return !(p && p.names === false);
+        } catch (e) { return true; }
+    }
     var FULL = /^0x[0-9a-f]{40}$/i;
     var SHORT = /^(0x[0-9a-f]{4,8})(?:…|\.\.\.)([0-9a-f]{3,6})$/i;
     // Shown names: plain lowercase ASCII labels, at most 64 characters, never address-like.
@@ -149,6 +159,10 @@
     }
 
     function scan() {
+        if (!enabled()) {
+            document.querySelectorAll('.f3r-name').forEach(function (s) { s.remove(); });
+            return;
+        }
         // Artwork details: owner and artist addresses, never contract addresses.
         document.querySelectorAll('dd').forEach(function (dd) {
             var t = ownText(dd), dt = dd.previousElementSibling;
@@ -176,6 +190,8 @@
     function start() {
         new MutationObserver(later).observe(document.body, { childList: true, subtree: true, characterData: true });
         addEventListener('hashchange', later);
+        // Settings is a dialog; closing it after a save re-applies the toggle even when nothing else re-rendered.
+        document.addEventListener('close', later, true);
         later();
     }
     if (document.body) start(); else addEventListener('DOMContentLoaded', start);

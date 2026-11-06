@@ -2531,6 +2531,7 @@ function Ra(e) {
           }
         }),
       appRpc: t.appRpc !== !1,
+      names: t.names !== !1,
       content: t.content && typeof t.content == "object" ? t.content : {},
       nftApi: t.nftApi && typeof t.nftApi == "object" ? t.nftApi : {},
       rpc: t.rpc && typeof t.rpc == "object" ? t.rpc : {},
@@ -2544,6 +2545,7 @@ function Ra(e) {
       folders: [],
       rpc: {},
       appRpc: !0,
+      names: !0,
       content: {},
       nftApi: {},
       view: "grid",
@@ -7463,7 +7465,9 @@ function Vd() {
     }
 }
 function Rs() {
-  ((p("#app-loading").value = I.loading), (p("#app-rpc").checked = I.appRpc !== !1));
+  ((p("#app-loading").value = I.loading),
+    (p("#app-rpc").checked = I.appRpc !== !1),
+    (p("#app-names").checked = I.names !== !1));
   for (let e of ["ipfs", "arweave"]) p("#gateway-" + e).value = I.content?.[e] || "";
   ((p("#nft-api-fields").innerHTML = Object.entries(kn)
     .map(
@@ -7653,6 +7657,7 @@ p("#settings-form").addEventListener("submit", (e) => {
     ((I.content = n),
       (I.nftApi = o),
       (I.appRpc = t.has("appRpc")),
+      (I.names = t.has("appNames")),
       (We.content = n),
       (ar.content = n),
       bt.clear(),
