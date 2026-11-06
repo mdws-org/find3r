@@ -189,11 +189,16 @@ An authenticated Art Blocks MCP client can use `get_token_metadata` and the
 wallets; filter to the requested address or use the exact-wallet GraphQL query.
 No MCP token is embedded in Find3r and users do not need MCP to browse.
 
-ASCII .eth names use Ethereum chain 1: ENS registry
-`0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e` `resolver(bytes32 namehash)`, followed
-by resolver `addr(bytes32 namehash)`. No HTTP/CCIP fallback is used. Use the
-explicit resolved wallet for offchain/wildcard/Unicode names. ENS can change;
-permanent content locators do not depend on it.
+ASCII ENS names (any multi-label name, not only .eth) use Ethereum chain 1 and the
+ENS Universal Resolver `0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe`:
+`resolve(bytes dnsEncodedName, bytes data)` with `addr(bytes32,uint256 60)`, then
+`addr(bytes32)`, which covers ENS v1, ENS v2 and offchain names. Offchain names
+revert with `OffchainLookup` (EIP-3668); `ens.js` answers ENSIP-21 batch lookups
+itself for exact-origin allow-listed gateways and otherwise uses ENS Labs'
+gateway. Primary names shown next to addresses come from
+`reverse(bytes addr, uint256 60)` and are shown only when they resolve forward to
+the same address. Use the explicit resolved wallet for Unicode names. ENS can
+change; permanent content locators do not depend on it.
 
 ## ABX
 
