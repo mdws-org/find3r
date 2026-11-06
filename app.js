@@ -4253,6 +4253,32 @@ function jo({ chainId: e, contract: t, tokenId: r }) {
     throw new Error("This ABX link is incomplete.");
   return { chainId: n, contract: t.toLowerCase(), tokenId: o };
 }
+// Which wallets own live tokens in which ABX collections, published every 15 minutes by the
+// abx.thebenmeadows.com Worker from resolver.abx.io data. Used only when it is well formed and
+// under ABX_OWNERS_MAX_AGE_MS old; otherwise discovery fetches each collection as before.
+const ABX_OWNERS_URL = "https://abx.thebenmeadows.com/abx-owners.json";
+const ABX_OWNERS_MAX_AGE_MS = 6 * 36e5;
+let abxOwnersCache;
+function abxOwnersIndex(fetcher) {
+  if (abxOwnersCache && abxOwnersCache.until > Date.now()) return abxOwnersCache.value;
+  const value = (async () => {
+    try {
+      const res = await fetcher(ABX_OWNERS_URL, { credentials: "omit", redirect: "error", signal: AbortSignal.timeout(8e3) });
+      if (!res.ok) return null;
+      const j = await res.json();
+      const age = Date.now() - Date.parse(j.generatedAt);
+      if (j.version !== 1 || !(age >= 0 && age < ABX_OWNERS_MAX_AGE_MS) || !Array.isArray(j.collections)) return null;
+      if (!j.owners || typeof j.owners != "object") return null;
+      const keys = new Map();
+      j.collections.forEach((c, i) => wt.test(c.address) && keys.set(c.chainId + ":" + c.address.toLowerCase(), i));
+      return { keys, owners: j.owners };
+    } catch {
+      return null;
+    }
+  })();
+  abxOwnersCache = { value, until: Date.now() + 3e5 };
+  return value;
+}
 var dn = class {
   constructor({ fetcher: t = (...n) => globalThis.fetch(...n), content: r = {} } = {}) {
     ((this.fetcher = t), (this.content = r), (this.cache = new Map()));
@@ -4331,6 +4357,26 @@ var dn = class {
       d = [...a],
       l = [],
       f = 0;
+    // Collections the published owner index covers take their counts from it; the rest are fetched one by one.
+    let idx = await abxOwnersIndex(this.fetcher);
+    if (idx) {
+      let mine = new Map((idx.owners[t] || []).map(([k, count]) => [k, count]));
+      c = c.filter((m) => {
+        let k = idx.keys.get(m.chainId + ":" + m.contract);
+        if (k === void 0) return !0;
+        let count = mine.get(k);
+        count &&
+          d.push({
+            ...m,
+            id: `abx:${m.chainId}:${m.contract}`,
+            kind: "collection-folder",
+            adapter: "abx",
+            type: "ABX collection",
+            count,
+          });
+        return !1;
+      });
+    }
     return (
       await Promise.all(
         Array.from({ length: Math.min(4, c.length) }, async () => {
