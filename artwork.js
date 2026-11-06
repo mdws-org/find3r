@@ -4046,12 +4046,14 @@ const classCache = {
     }
     return (this.db ||= new Promise((resolve) => {
       try {
-        const req = indexedDB.open("find3r.cache.v1", 1);
+        // Same version and stores as app.js, so whichever page opens the database first, both can use it.
+        const req = indexedDB.open("find3r.cache.v1", 2);
         req.onupgradeneeded = () => {
           const db = req.result;
           db.objectStoreNames.contains("classes") ||
             db.createObjectStore("classes", { keyPath: "key" }).createIndex("created", "created");
           db.objectStoreNames.contains("lists") || db.createObjectStore("lists", { keyPath: "key" });
+          db.objectStoreNames.contains("names") || db.createObjectStore("names", { keyPath: "key" });
         };
         req.onsuccess = () => {
           const db = req.result;
@@ -4095,6 +4097,11 @@ const classCache = {
     });
     return this.valid(box?.value);
   },
+  async remove(chainId, contract) {
+    await this.run("readwrite", (s) => {
+      s.delete(Number(chainId) + ":" + contract.toLowerCase());
+    });
+  },
   async put(chainId, contract, value) {
     const now = Date.now(),
       rec = { ...value, key: Number(chainId) + ":" + contract.toLowerCase(), created: now };
@@ -4114,11 +4121,47 @@ const classCache = {
     });
   },
 };
+// A class served from the cache is re-read once per page before it is used: abxVersion and both ERC-165 probes
+// in one Multicall3 call at the pinned block, the same check app.js runs. A class that changed is forgotten and
+// the live path runs; a check that cannot run leaves the cache unused for this load.
+const CLASS_PROBE_DATA = [
+    "0x4aa3adb3",
+    "0x01ffc9a7" + "80ac58cd".padEnd(64, "0"),
+    "0x01ffc9a7" + "d9b67a26".padEnd(64, "0"),
+  ],
+  verifiedClasses = new Set();
+async function verifiedClass(rpc, chainId, contract, known) {
+  if (!known) return;
+  const key = Number(chainId) + ":" + contract.toLowerCase();
+  if (verifiedClasses.has(key)) return known;
+  let res;
+  try {
+    res = await rpc.call(
+      Vs,
+      "function aggregate3((address target,bool allowFailure,bytes callData)[]) view returns ((bool success,bytes returnData)[])",
+      [CLASS_PROBE_DATA.map((callData) => ({ target: contract, allowFailure: !0, callData }))],
+      { gas: 5000000n },
+    );
+    if (!Array.isArray(res) || res.length !== CLASS_PROBE_DATA.length) throw Error("Incomplete class check.");
+  } catch {
+    return;
+  }
+  const word = (c) => (c?.success && /^0x[0-9a-f]{64}$/i.test(String(c.returnData)) ? String(c.returnData) : null),
+    isTrue = (c) => /^0x0{63}1$/i.test(word(c) || ""),
+    raw = word(res[0]) ? BigInt(word(res[0])) : 0n,
+    version = raw > 0n && raw <= 65535n ? Number(raw) : 0,
+    standard = isTrue(res[1]) ? "erc721" : isTrue(res[2]) ? "erc1155" : void 0;
+  if (standard && standard === known.standard && version === (known.abxVersion || 0)) {
+    verifiedClasses.add(key);
+    return known;
+  }
+  await classCache.remove(chainId, contract);
+}
 async function tc(e, t, r) {
   if (!Qs.test(r)) throw new Error("Enter a contract address.");
   if (((r = r.toLowerCase()), await e.pin(t), Kn(t, r)))
     return { chainId: 1, contract: be, name: "CryptoPunks", standard: "punks", adapter: "nft", direct: !0 };
-  let known = await classCache.get(t, r);
+  let known = await verifiedClass(e, t, r, await classCache.get(t, r));
   if (known) return collectionClass(t, r, known.standard, known.name, known.abxVersion || 0);
   let n = await e.request("eth_getCode", [r, e.block]);
   if (n === "0x" || ec(n)) return;
@@ -4131,7 +4174,9 @@ async function tc(e, t, r) {
     d = a ? "erc721" : i ? "erc1155" : void 0,
     v = c > 0n ? Number(c) : 0,
     name = typeof s == "string" && s ? s.slice(0, 160) : void 0;
-  d && classCache.put(t, r, { standard: d, ...(name ? { name } : {}), ...(v ? { abxVersion: v } : {}) });
+  d &&
+    (classCache.put(t, r, { standard: d, ...(name ? { name } : {}), ...(v ? { abxVersion: v } : {}) }),
+    verifiedClasses.add(Number(t) + ":" + r));
   return collectionClass(t, r, d, s, v);
 }
 function collectionClass(t, r, d, s, v) {
@@ -4204,7 +4249,11 @@ var fa = vr,
       if ((r || ((r = this.rpcFor(o.chainId)), await r.pin(o.chainId)), Kn(o.chainId, o.contract)))
         return Qi(r, o.tokenId);
       if (ca(o.chainId, o.contract)) return la(r, o.tokenId);
-      let cachedClass = n || (Hr(o.chainId, o.contract) ? void 0 : await classCache.get(o.chainId, o.contract));
+      let cachedClass =
+        n ||
+        (Hr(o.chainId, o.contract)
+          ? void 0
+          : await verifiedClass(r, o.chainId, o.contract, await classCache.get(o.chainId, o.contract)));
       let [a, i, s] = cachedClass
         ? [cachedClass.standard === "erc721", cachedClass.standard === "erc1155", BigInt(cachedClass.abxVersion || 0)]
         : Hr(o.chainId, o.contract)
