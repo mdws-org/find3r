@@ -6428,7 +6428,7 @@ function As() {
     (p("#sort").value = o),
     (p("#sort").disabled = C));
 }
-async function Dd() {
+async function Dd(onPartial) {
   let e = u,
     t;
   (e.folder.kind === "wallet" &&
@@ -6450,24 +6450,38 @@ async function Dd() {
     let s = t + ":" + (e.folder.chainId || 0),
       c = sr.get(s);
     if (c && c.until > Date.now()) return c.result;
-    let d = await Promise.allSettled([
+    // Categories appear as their checks finish: each settled probe redraws the folders found so far.
+    let probes = [
         ln({ ...n, probe: !0, rpcFor: D }),
         xn.folders(n),
         ir.folders({ ...n, probe: !0 }),
         bt.folders({ ...n, probe: !0 }),
-      ]),
-      l = ["apps", "artblocks", "abx", "nft"],
+      ],
+      settled = [];
+    probes.forEach((pr, w) =>
+      pr.then(
+        (value) => ((settled[w] = { status: "fulfilled", value }), onPartial?.(categories(settled, !1))),
+        (reason) => (settled[w] = { status: "rejected", reason }),
+      ),
+    );
+    let d = await Promise.allSettled(probes),
+      g = categories(d, !0);
+    return (sr.set(s, { until: Date.now() + 6e4, result: g }), g);
+  }
+  function categories(d, final) {
+    let l = ["apps", "artblocks", "abx", "nft"],
       f = [],
       g = {
         items: l.flatMap((h, w) => {
           let y = d[w];
+          if (!y) return [];
           if (y.status === "rejected")
             return (
               f.push(le[h] + " couldn\u2019t be checked. Open its folder to retry."),
               [{ id: "category:" + h, kind: "category", source: h, name: le[h], type: "Check this folder" }]
             );
           ((w === 0 && Ss(y.value)) || w === 2) && y.value.warning && f.push(y.value.warning);
-          let b = d[0].status === "fulfilled" && d[0].value.found;
+          let b = d[0]?.status === "fulfilled" && d[0].value.found;
           return (
             w === 0
               ? y.value.found || Ss(y.value)
@@ -6480,9 +6494,9 @@ async function Dd() {
             : [];
         }),
         ordered: !0,
-        warning: f.join(" "),
+        warning: final ? f.join(" ") : "",
       };
-    return (sr.set(s, { until: Date.now() + 6e4, result: g }), g);
+    return g;
   }
   if (r === "contract")
     return {
@@ -6627,7 +6641,9 @@ async function P(e, { remember: t = !0, fromHash: r = !1, autoOpen: n = !1, laun
       }))),
         (p("#empty").textContent = I.folders.length ? "" : "Your saved addresses will appear here."));
     else if (Ce()) {
-      let s = await Dd();
+      let s = await Dd((partial) => {
+        a === _ && partial.items.length && ((U = partial.items), xt());
+      });
       if (a !== _) return;
       ((Z = s),
         (U = s.items),
