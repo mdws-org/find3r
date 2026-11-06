@@ -29,8 +29,8 @@ function makeEnsResolver(ethCall, keccak256) {
         var n = String(name).trim().toLowerCase();
         if (!/^[\x21-\x7e]+$/.test(n)) fail(name + ': only plain ASCII ENS names work here - paste the 0x address instead');
         var labels = n.split('.');
-        var ok = labels.length > 1 && labels.every(function (l) {
-            return /^_*[a-z0-9-]+$/.test(l) && l.slice(2, 4) !== '--';
+        var ok = n.length <= 253 && labels.length > 1 && labels.every(function (l) {
+            return l.length <= 63 && /^_*[a-z0-9-]+$/.test(l) && l.slice(2, 4) !== '--';
         });
         if (!ok) fail(name + ': not a valid ENS name');
         return n;
@@ -89,11 +89,13 @@ function makeEnsResolver(ethCall, keccak256) {
         if (!directOk(url)) return Promise.reject(new Error('gateway not reachable from this page'));
         var get = url.indexOf('{data}') >= 0;
         var u = url.split('{sender}').join(sender.toLowerCase()).split('{data}').join('0x' + data);
-        var opts = get ? {} : {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ data: '0x' + data, sender: sender.toLowerCase() }),
-        };
+        // No redirects: the origin check above would not cover where a redirect leads.
+        var opts = { redirect: 'error', credentials: 'omit' };
+        if (!get) {
+            opts.method = 'POST';
+            opts.headers = { 'content-type': 'application/json' };
+            opts.body = JSON.stringify({ data: '0x' + data, sender: sender.toLowerCase() });
+        }
         if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) opts.signal = AbortSignal.timeout(TIMEOUT_MS);
         return fetch(u, opts).then(function (r) {
             if (!r.ok) fail('gateway HTTP ' + r.status);
@@ -136,7 +138,9 @@ function makeEnsResolver(ethCall, keccak256) {
         var urls = stringsAt(h, at(h, 32), MAX_URLS);
         var callData = bytesIn(h, 2), callback = h.slice(192, 200), extra = bytesIn(h, 4);
         var viaEns = function () { return firstGateway(urls.filter(function (u) { return u.indexOf('http') === 0; }).concat([GATEWAY]), sender, callData); };
-        var answer = callData.slice(0, 8) === 'a780bab6' ? localBatch(callData).catch(viaEns) : viaEns();
+        var answer = callData.slice(0, 8) === 'a780bab6'
+            ? Promise.resolve().then(function () { return localBatch(callData); }).catch(viaEns)
+            : viaEns();
         return answer.then(function (resp) {
             var a = bytesArg(resp);
             return call('0x' + callback + word(0x40) + word(0x40 + a.length / 2) + a + bytesArg(extra), hops + 1);
@@ -189,9 +193,13 @@ function makeEnsResolver(ethCall, keccak256) {
                 function (e) { fail(why(e) || none); });
         }
         // addr(bytes32, 60) first: the ENSIP-9 record every current resolver keeps for Ethereum.
+        // A resolver that rejects the multicoin profile (ResolverError) may still answer the older one.
         return call(resolveCall(dns, 'f1cb7e06' + node + word(60)), 0).then(
             function (r) { return addrFrom(r, 60) || legacy(); },
-            function (e) { var m = why(e); if (m) fail(m); return legacy(); });
+            function (e) {
+                if (e && typeof e.data === 'string' && e.data.slice(0, 10) === '0x95c0c752') return legacy();
+                var m = why(e); if (m) fail(m); return legacy();
+            });
     }
 
     // Primary name of an Ethereum address (ENSIP-19), through the same offchain-capable call path.

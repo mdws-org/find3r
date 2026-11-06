@@ -2246,8 +2246,9 @@ var W = class extends Error {},
             body: JSON.stringify({ jsonrpc: "2.0", id: o, method: t, params: r }),
             signal: AbortSignal.timeout(3e4),
           });
-          if (a.status !== 429 || attempt >= 2) break;
-          await new Promise((s) => setTimeout(s, 400 * (attempt + 1)));
+          if (!(a.status === 429 || a.status === 503) || attempt >= 2) break;
+          const after = Number(a.headers.get("retry-after")) * 1e3;
+          await new Promise((s) => setTimeout(s, Math.min(after > 0 ? after : 400 * (attempt + 1) + Math.random() * 300, 5e3)));
         }
         if (!a.ok) throw new Error();
         let s = a.body.getReader(),
@@ -2308,14 +2309,26 @@ var W = class extends Error {},
     static PIN_TTL_MS = 15e3;
     async pin(t) {
       let c = Xt.pins.get(this.url);
-      if (c && c.chainId === Number(t) && Date.now() - c.at < Xt.PIN_TTL_MS) {
+      if (c && c.chainId === Number(t) && !c.pending && Date.now() - c.at < Xt.PIN_TTL_MS) {
         ((this.chainId = c.chainId), (this.block = c.block));
         return;
       }
-      if (((this.block = void 0), (this.chainId = void 0), BigInt(await this.request("eth_chainId")) !== BigInt(t)))
-        throw new Error("RPC is on the wrong chain.");
-      ((this.chainId = Number(t)), (this.block = await this.request("eth_blockNumber")));
-      Xt.pins.set(this.url, { chainId: this.chainId, block: this.block, at: Date.now() });
+      ((this.block = void 0), (this.chainId = void 0));
+      // Clients that miss at the same moment share one read, so they pin the same block.
+      if (!(c && c.pending && c.chainId === Number(t))) {
+        const pending = (async () => {
+          if (BigInt(await this.request("eth_chainId")) !== BigInt(t)) throw new Error("RPC is on the wrong chain.");
+          return { chainId: Number(t), block: await this.request("eth_blockNumber"), at: Date.now() };
+        })();
+        c = { chainId: Number(t), pending };
+        Xt.pins.set(this.url, c);
+        pending.then(
+          (r) => Xt.pins.get(this.url) === c && Xt.pins.set(this.url, r),
+          () => Xt.pins.get(this.url) === c && Xt.pins.delete(this.url),
+        );
+      }
+      const r = await c.pending;
+      ((this.chainId = r.chainId), (this.block = r.block));
     }
     async call(t, r, n = [], { gas: o } = {}) {
       if (!this.block) throw new Error("Pin the RPC block before reading.");
@@ -3059,6 +3072,23 @@ var Gr = 40n;
 // these calls go to the same endpoint directly, at the block the client pinned.
 const ensResolvers = new WeakMap();
 const OFFCHAIN_LOOKUP = /0x556f1830[0-9a-f]*/i;
+// Parse a JSON body of at most `max` bytes; a longer reply is refused instead of filling memory.
+async function readJsonCapped(res, max) {
+  const reader = res.body?.getReader();
+  if (!reader) return res.json();
+  const parts = [];
+  let n = 0;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    if ((n += value.length) > max) {
+      await reader.cancel();
+      throw new Error("The reply was too large.");
+    }
+    parts.push(value);
+  }
+  return JSON.parse(await new Blob(parts).text());
+}
 function ensEthCall(t) {
   return async (to, data) => {
     let res;
@@ -3075,10 +3105,11 @@ function ensEthCall(t) {
       throw new Error("ENS lookup could not reach the RPC.");
     }
     if (!res.ok) throw new Error(`ENS lookup failed (HTTP ${res.status}).`);
-    const j = await res.json();
+    const j = await readJsonCapped(res, 8e6);
     if (j.error) {
       const err = new Error(String(j.error.message || "ENS lookup failed."));
-      const raw = typeof j.error.data === "string" ? j.error.data : JSON.stringify(j.error.data ?? "");
+      // Revert data as a plain string, or anywhere inside the error (some providers put it in the message).
+      const raw = typeof j.error.data === "string" ? j.error.data : JSON.stringify(j.error);
       const m = /^0x[0-9a-f]*$/i.test(raw) ? [raw] : OFFCHAIN_LOOKUP.exec(raw) || /0x[0-9a-f]{8,}/i.exec(raw);
       if (m) err.data = m[0];
       throw err;
@@ -4265,13 +4296,32 @@ function abxOwnersIndex(fetcher) {
     try {
       const res = await fetcher(ABX_OWNERS_URL, { credentials: "omit", redirect: "error", signal: AbortSignal.timeout(8e3) });
       if (!res.ok) return null;
-      const j = await res.json();
+      const j = await readJsonCapped(res, 4e6);
       const age = Date.now() - Date.parse(j.generatedAt);
-      if (j.version !== 1 || !(age >= 0 && age < ABX_OWNERS_MAX_AGE_MS) || !Array.isArray(j.collections)) return null;
-      if (!j.owners || typeof j.owners != "object") return null;
+      if (j.version !== 1 || !(age >= 0 && age < ABX_OWNERS_MAX_AGE_MS)) return null;
+      if (!Array.isArray(j.collections) || j.collections.length > 1e4 || !j.owners || typeof j.owners != "object") return null;
       const keys = new Map();
-      j.collections.forEach((c, i) => wt.test(c.address) && keys.set(c.chainId + ":" + c.address.toLowerCase(), i));
-      return { keys, owners: j.owners };
+      j.collections.forEach(
+        (c, i) => c && Number.isInteger(c.chainId) && wt.test(c.address) && keys.set(c.chainId + ":" + c.address.toLowerCase(), i),
+      );
+      // Owner entries are kept only in the shape the Worker writes: [collection index, positive count].
+      const owners = new Map();
+      for (const [w, list] of Object.entries(j.owners)) {
+        if (!wt.test(w) || !Array.isArray(list) || list.length > 1e3) continue;
+        const ok = list.filter(
+          (e) =>
+            Array.isArray(e) &&
+            Number.isInteger(e[0]) &&
+            e[0] >= 0 &&
+            e[0] < j.collections.length &&
+            Number.isInteger(e[1]) &&
+            e[1] > 0 &&
+            e[1] <= 1e6,
+        );
+        owners.set(w.toLowerCase(), ok);
+        if (owners.size > 2e5) return null;
+      }
+      return { keys, owners, age };
     } catch {
       return null;
     }
@@ -4443,10 +4493,31 @@ const crossVisit = {
   },
 };
 globalThis.find3rNameCache = { get: (addr) => crossVisit.name(addr), put: (addr, name) => crossVisit.putName(addr, name) };
-const ABX_LIST_FRESH_MS = 36e5;
+const ABX_LIST_FRESH_MS = 36e5,
+  ABX_LIST_STALE_MAX_MS = 7 * 864e5;
 var dn = class {
-  constructor({ fetcher: t = (...n) => globalThis.fetch(...n), content: r = {} } = {}) {
-    ((this.fetcher = t), (this.content = r), (this.cache = new Map()));
+  constructor({ fetcher: t = (...n) => globalThis.fetch(...n), content: r = {}, rpcFor: n } = {}) {
+    ((this.fetcher = t), (this.content = r), (this.rpcFor = n), (this.cache = new Map()));
+  }
+  // Rows taken from the owner index are checked on chain where balanceOf(owner) answers (ERC-721): the chain's
+  // count replaces the index's and a zero balance removes the row. Rows the chain cannot answer keep the index count.
+  async confirmOnChain(rows, owner) {
+    const byChain = new Map();
+    for (const r of rows) (byChain.get(r.chainId) || byChain.set(r.chainId, []).get(r.chainId)).push(r);
+    await Promise.all(
+      [...byChain].map(async ([chainId, list]) => {
+        try {
+          const h = this.rpcFor(chainId);
+          await h.pin(chainId);
+          const res = await familiarBalances(h, list, owner);
+          res.forEach((x, i) => {
+            if (x.status !== "fulfilled") return;
+            if (x.value) list[i].count = x.value.count;
+            else list[i].drop = !0;
+          });
+        } catch {}
+      }),
+    );
   }
   async json(t, r = 8 * 1024 * 1024, fresh = !1) {
     let n = this.cache.get(t);
@@ -4482,7 +4553,8 @@ var dn = class {
     try {
       return await fetchAndStore();
     } catch (e) {
-      if (stored) return stored.value;
+      // A stored list stands in for a failed fetch for up to a week, not forever.
+      if (stored && Date.now() - stored.fetched < ABX_LIST_STALE_MAX_MS) return stored.value;
       throw e;
     }
   }
@@ -4490,7 +4562,7 @@ var dn = class {
     let t = await this.projects();
     if (!Array.isArray(t) || t.length > 5e3) throw new Error("ABX returned an unexpected collection list.");
     return t
-      .filter((r) => ss.includes(r.chainId) && wt.test(r.address))
+      .filter((r) => r && typeof r == "object" && ss.includes(r.chainId) && wt.test(r.address))
       .map((r) => ({
         chainId: r.chainId,
         contract: r.address.toLowerCase(),
@@ -4553,7 +4625,7 @@ var dn = class {
     // Collections the published owner index covers take their counts from it; the rest are fetched one by one.
     let idx = await abxOwnersIndex(this.fetcher);
     if (idx) {
-      let mine = new Map((idx.owners[t] || []).map(([k, count]) => [k, count]));
+      let mine = new Map((idx.owners.get(t) || []).map(([k, count]) => [k, count]));
       c = c.filter((m) => {
         let k = idx.keys.get(m.chainId + ":" + m.contract);
         if (k === void 0) return !0;
@@ -4566,9 +4638,17 @@ var dn = class {
             adapter: "abx",
             type: "ABX collection",
             count,
+            fromIndex: !0,
           });
         return !1;
       });
+      if (this.rpcFor) {
+        await this.confirmOnChain(
+          d.filter((x) => x.fromIndex),
+          t,
+        );
+        d = d.filter((x) => !x.drop);
+      }
     }
     return (
       await Promise.all(
@@ -4598,6 +4678,7 @@ var dn = class {
         warning: [
           s ? "The ABX directory couldn\u2019t be checked. Your app orgs are still available." : "",
           l.length ? `${l.length} ABX collections couldn\u2019t be checked. Refresh to try again.` : "",
+          idx ? `ABX holdings come from an index ${Math.max(1, Math.round(idx.age / 6e4))} minutes old.` : "",
         ]
           .filter(Boolean)
           .join(" "),
@@ -5253,8 +5334,12 @@ async function familiarBalances(rpc, collections, owner) {
       return { status: "rejected" };
     }
   };
-  const callData = Oe({ abi: ve([BALANCE_OF]), functionName: "balanceOf", args: [owner] });
   const out = [];
+  if (!MULTICALL3_CHAINS.has(rpc.chainId)) {
+    for (const y of collections) out.push(await one(y));
+    return out;
+  }
+  const callData = Oe({ abi: ve([BALANCE_OF]), functionName: "balanceOf", args: [owner] });
   for (let a = 0; a < collections.length; a += 32) {
     const batch = collections.slice(a, a + 32);
     try {
@@ -5266,8 +5351,10 @@ async function familiarBalances(rpc, collections, owner) {
       );
       if (!Array.isArray(res) || res.length !== batch.length) throw Error("Incomplete balance checks.");
       res.forEach((c, d) => {
-        if (!c.success || !/^0x[0-9a-f]{64}$/i.test(c.returnData)) return out.push({ status: "rejected" });
-        const n = BigInt(c.returnData);
+        // The first word of the reply is the balance; a token that returns more is still read.
+        const w = typeof c.returnData == "string" && /^0x[0-9a-f]{64}/i.test(c.returnData) ? c.returnData.slice(0, 66) : null;
+        if (!c.success || !w) return out.push({ status: "rejected" });
+        const n = BigInt(w);
         out.push({ status: "fulfilled", value: n ? { ...batch[d], count: Number(n) } : void 0 });
       });
     } catch {
@@ -6286,7 +6373,7 @@ var u = {},
   In = [],
   Ve = new Map(),
   xn = new sn(),
-  ar = new dn({ content: I.content }),
+  ar = new dn({ content: I.content, rpcFor: D }),
   We = new hn({ rpcFor: D, content: I.content }),
   bt = new pn({ prefs: I, rpcFor: D, catalog: We }),
   ir = new mn({ nfts: bt, directory: ar, catalog: We, rpcFor: D }),

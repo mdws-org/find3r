@@ -16,32 +16,53 @@
     var cache = new Map(); // address -> Promise<name | null>
     var queue = [], active = 0, started = 0;
 
+    // The Ethereum RPC from Settings; the public default when none is set; null when one is set but this
+    // page cannot use it (then no lookup runs, rather than sending addresses to a third party).
     function rpcUrl() {
+        var set;
         try {
             var p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
-            var u = p && p.rpc && p.rpc['1'];
-            if (typeof u === 'string') {
-                var url = new URL(u);
-                if (url.protocol === 'https:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname)) return url.href;
-            }
+            set = p && p.rpc && p.rpc['1'];
         } catch (e) { /* no stored settings, or storage blocked */ }
-        return DEFAULT_RPC;
+        if (set === undefined || set === null || set === '') return DEFAULT_RPC;
+        try {
+            var url = new URL(String(set));
+            if (url.protocol === 'https:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname)) return url.href;
+        } catch (e) { /* not a URL */ }
+        return null;
+    }
+
+    // Parse a JSON body of at most `max` bytes.
+    function readJsonCapped(r, max) {
+        var reader = r.body && r.body.getReader();
+        if (!reader) return r.json();
+        var parts = [], n = 0;
+        return (function next() {
+            return reader.read().then(function (c) {
+                if (c.done) return new Blob(parts).text().then(JSON.parse);
+                if ((n += c.value.length) > max) { reader.cancel(); throw new Error('reply too large'); }
+                parts.push(c.value);
+                return next();
+            });
+        })();
     }
 
     function ethCall(to, data) {
+        var u = rpcUrl();
+        if (!u) return Promise.reject(new Error('no usable RPC for name lookups'));
         var opts = {
             method: 'POST', redirect: 'error', credentials: 'omit',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: to, data: data }, 'latest'] }),
         };
         if (AbortSignal.timeout) opts.signal = AbortSignal.timeout(15000);
-        return fetch(rpcUrl(), opts).then(function (r) {
+        return fetch(u, opts).then(function (r) {
             if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
+            return readJsonCapped(r, 8000000);
         }).then(function (j) {
             if (j.error) {
                 var err = new Error(String(j.error.message || 'eth_call failed'));
-                var raw = typeof j.error.data === 'string' ? j.error.data : JSON.stringify(j.error.data || '');
+                var raw = typeof j.error.data === 'string' ? j.error.data : JSON.stringify(j.error);
                 var m = /^0x[0-9a-f]*$/i.test(raw) ? [raw] : /0x556f1830[0-9a-f]*/i.exec(raw) || /0x[0-9a-f]{8,}/i.exec(raw);
                 if (m) err.data = m[0];
                 throw err;

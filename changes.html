@@ -59,6 +59,17 @@
         <a href="https://github.com/mdws-org/find3r/commit/9de2efb">Commit</a>
       </p>
 
+      <h2 id="leaves">What leaves the browser</h2>
+      <p>
+        Beyond what find3r already sent (chain reads to the RPCs, collection lookups to resolver.abx.io and
+        data.artblocks.io), this fork sends: the addresses it labels with names to the Ethereum RPC (from Settings,
+        else ethereum-rpc.publicnode.com), and for offchain names the lookup to that name's gateway (api.coinbase.com,
+        ccip-v3.ens.xyz or dnssec-oracle.ens.domains); one request per wallet view for the ABX owner index at
+        abx.thebenmeadows.com, which carries no wallet address; and early connections to those hosts when a page
+        opens. ABX holdings come from that index, which is rebuilt every 15 minutes and can run about an hour behind;
+        the folder says how old it is.
+      </p>
+
       <h2 id="look">The thebenmeadows.com look, light and dark</h2>
       <p>
         Colors, type (Public Sans) and the flat style of thebenmeadows.com, with a dark theme that follows your system
