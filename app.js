@@ -4441,6 +4441,13 @@ const crossVisit = {
       };
     });
   },
+  async deleteClasses(chainId, contracts) {
+    if (!contracts.length) return;
+    await this.run("classes", "readwrite", (tx) => {
+      const s = tx.objectStore("classes");
+      for (const c of contracts) s.delete(Number(chainId) + ":" + c.toLowerCase());
+    });
+  },
   async list(key) {
     const rec = await this.run("lists", "readonly", (tx) => {
       const r = tx.objectStore("lists").get(key);
@@ -5591,11 +5598,70 @@ async function j(e, t, r, n = []) {
     throw o;
   }
 }
+// A collection class served from the cross-visit cache is re-read once per session before it is used:
+// abxVersion and both ERC-165 probes for every cached contract, in one Multicall3 call at the pinned block.
+// An entry whose class changed (an upgraded proxy, for example) is deleted and the contract takes the live
+// path again, which also refreshes its name. When the check itself fails, the cache is not used for that load.
+const CLASS_PROBES = [
+    Sd,
+    Oe({ abi: ve([gt]), functionName: "supportsInterface", args: ["0x80ac58cd"] }),
+    Oe({ abi: ve([gt]), functionName: "supportsInterface", args: ["0xd9b67a26"] }),
+  ],
+  CLASS_CHECK_BATCH = 10,
+  verifiedClasses = new Set();
+function probedBool(c) {
+  return !!c?.success && /^0x0{63}1$/i.test(String(c.returnData));
+}
+function probedClass([version, is721, is1155]) {
+  let v = 0;
+  if (version?.success && /^0x[0-9a-f]{64}$/i.test(String(version.returnData)))
+    try {
+      const [n] = je(Ad, version.returnData);
+      v = n > 0 ? Number(n) : 0;
+    } catch {
+      v = 0;
+    }
+  const standard = probedBool(is721) ? "erc721" : probedBool(is1155) ? "erc1155" : void 0;
+  return { standard, abxVersion: v };
+}
+async function verifyClasses(rpc, chainId, known) {
+  const pending = [...known.keys()].filter((c) => !verifiedClasses.has(Number(chainId) + ":" + c));
+  if (!pending.length) return known;
+  const stale = [];
+  for (let a = 0; a < pending.length; a += CLASS_CHECK_BATCH) {
+    const batch = pending.slice(a, a + CLASS_CHECK_BATCH);
+    let res;
+    try {
+      res = await rpc.call(
+        ls,
+        "function aggregate3((address target,bool allowFailure,bytes callData)[]) view returns ((bool success,bytes returnData)[])",
+        [batch.flatMap((c) => CLASS_PROBES.map((callData) => ({ target: c, allowFailure: !0, callData })))],
+        { gas: 5000000n },
+      );
+      if (!Array.isArray(res) || res.length !== batch.length * CLASS_PROBES.length) throw Error("Incomplete class checks.");
+    } catch {
+      for (const c of batch) known.delete(c);
+      continue;
+    }
+    batch.forEach((c, i) => {
+      const live = probedClass(res.slice(i * CLASS_PROBES.length, (i + 1) * CLASS_PROBES.length)),
+        was = known.get(c);
+      if (live.standard && live.standard === was.standard && live.abxVersion === (was.abxVersion || 0)) {
+        verifiedClasses.add(Number(chainId) + ":" + c);
+        return;
+      }
+      known.delete(c);
+      stale.push(c);
+    });
+  }
+  stale.length && crossVisit.deleteClasses(chainId, stale);
+  return known;
+}
 async function Pd(e, t, r) {
   if (!Bd.test(r)) throw new Error("Enter a contract address.");
   if (((r = r.toLowerCase()), await e.pin(t), Fo(t, r)))
     return { chainId: 1, contract: He, name: "CryptoPunks", standard: "punks", adapter: "nft", direct: !0 };
-  let known = (await crossVisit.classes(t, [r])).get(r);
+  let known = (await verifyClasses(e, t, await crossVisit.classes(t, [r]))).get(r);
   if (known) return collectionClass(t, r, known.standard, known.name, known.abxVersion || 0);
   let n = await e.request("eth_getCode", [r, e.block]);
   if (n === "0x" || Ld(n)) return;
@@ -5967,10 +6033,18 @@ var Te = (e) => e.chainId + ":" + e.contract.toLowerCase(),
           let E = b.filter((S) => S.chainId === v),
             $ = E.filter((S) => !(this.checked.get(Te(S))?.until > Date.now()));
           if ($.length) {
-            const known = await crossVisit.classes(
+            let known = await crossVisit.classes(
               v,
               $.map((x) => x.contract),
             );
+            if (known.size)
+              try {
+                const S = this.rpcFor(v);
+                await S.pin(v);
+                known = await verifyClasses(S, v, known);
+              } catch {
+                known = new Map();
+              }
             for (const x of $) {
               const k = known.get(x.contract.toLowerCase());
               k &&
