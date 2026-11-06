@@ -56,7 +56,20 @@
         An opened wallet and an artwork's owner and artist show the address's ENS primary name, for example
         "0x98f1bd…14934 · thebenmeadows.eth". A name is shown only if it points back to the same address. Lookups use
         the Ethereum connection from Settings when you have set one. Contract addresses never get a name.
-        <a href="https://github.com/mdws-org/find3r/commit/9de2efb">Commit</a>
+        <a href="https://github.com/mdws-org/find3r/commit/9de2efb">Commit</a>. Settings has a switch, "Show ENS
+        names next to addresses", on by default; off removes the labels and stops the lookups, while a name typed
+        into the address box still resolves.
+        <a href="https://github.com/mdws-org/find3r/commit/81f6540">Commit</a>
+      </p>
+
+      <h2 id="class-check">Remembered collection types are re-checked</h2>
+      <p>
+        Whether a contract is an ERC-721 or ERC-1155 collection, and its ABX version, is remembered on this device
+        for 30 days so a folder does not re-ask the chain for every collection. Before a remembered answer is used,
+        this fork re-reads those three facts for every remembered contract in one Multicall3 call at the pinned
+        block; an answer that changed (an upgraded proxy, for example) is forgotten and read live again. If that
+        check cannot run, the remembered answers are not used for that load.
+        <a href="https://github.com/mdws-org/find3r/commit/21313da">Commit</a>
       </p>
 
       <h2 id="leaves">What leaves the browser</h2>
