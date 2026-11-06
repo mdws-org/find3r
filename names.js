@@ -1,0 +1,140 @@
+/* ENS primary names next to wallet addresses.
+
+   A name is the address's primary name (ENSIP-19, through the Universal Resolver in ens.js,
+   offchain names included) and is shown only when it resolves forward to the same address,
+   so a reverse record cannot claim someone else's name. Lookups use the Ethereum RPC from
+   find3r's Settings when one is set, else the public default. This only appends a label;
+   find3r's own text and links are untouched. */
+(function () {
+    var DEFAULT_RPC = 'https://ethereum-rpc.publicnode.com';
+    var PREFS_KEY = 'find3r.preferences.v1';
+    var FULL = /^0x[0-9a-f]{40}$/i;
+    var SHORT = /^(0x[0-9a-f]{4,8})(?:…|\.\.\.)([0-9a-f]{3,6})$/i;
+    // Shown names: plain lowercase ASCII labels, at most 64 characters, never address-like.
+    var SHOWN = /^[a-z0-9_-]+(\.[a-z0-9-]+)+$/;
+    var MAX_LOOKUPS = 40, IN_FLIGHT = 4;
+    var cache = new Map(); // address -> Promise<name | null>
+    var queue = [], active = 0, started = 0;
+
+    function rpcUrl() {
+        try {
+            var p = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+            var u = p && p.rpc && p.rpc['1'];
+            if (typeof u === 'string') {
+                var url = new URL(u);
+                if (url.protocol === 'https:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(url.hostname)) return url.href;
+            }
+        } catch (e) { /* no stored settings, or storage blocked */ }
+        return DEFAULT_RPC;
+    }
+
+    function ethCall(to, data) {
+        var opts = {
+            method: 'POST', redirect: 'error', credentials: 'omit',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: to, data: data }, 'latest'] }),
+        };
+        if (AbortSignal.timeout) opts.signal = AbortSignal.timeout(15000);
+        return fetch(rpcUrl(), opts).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }).then(function (j) {
+            if (j.error) {
+                var err = new Error(String(j.error.message || 'eth_call failed'));
+                var raw = typeof j.error.data === 'string' ? j.error.data : JSON.stringify(j.error.data || '');
+                var m = /^0x[0-9a-f]*$/i.test(raw) ? [raw] : /0x556f1830[0-9a-f]*/i.exec(raw) || /0x[0-9a-f]{8,}/i.exec(raw);
+                if (m) err.data = m[0];
+                throw err;
+            }
+            return j.result;
+        });
+    }
+
+    var ens = null;
+    function resolver() {
+        if (!ens) ens = window.makeEnsResolver(ethCall, window.keccak256);
+        return ens;
+    }
+
+    function lookup(addr) {
+        return resolver().reverse(addr).then(function (name) {
+            if (!name) return null;
+            name = name.toLowerCase();
+            if (name.length > 64 || !SHOWN.test(name) || /^0x[0-9a-f]{4,}/.test(name)) return null;
+            return resolver().resolve(name).then(function (fwd) {
+                return fwd && fwd.toLowerCase() === addr ? name : null;
+            });
+        }).catch(function () { return null; });
+    }
+
+    function pump() {
+        while (active < IN_FLIGHT && queue.length) {
+            var job = queue.shift();
+            active++;
+            lookup(job.addr).then(job.done, function () { job.done(null); }).then(function () { active--; pump(); });
+        }
+    }
+
+    function nameFor(addr) {
+        addr = addr.toLowerCase();
+        if (!cache.has(addr)) {
+            if (started >= MAX_LOOKUPS) return Promise.resolve(null);
+            started++;
+            cache.set(addr, new Promise(function (done) { queue.push({ addr: addr, done: done }); pump(); }));
+        }
+        return cache.get(addr);
+    }
+
+    function label(el, addr) {
+        var existing = el.querySelector(':scope > .f3r-name');
+        if (el.dataset.f3rName !== addr) {
+            if (existing) existing.remove();
+            existing = null;
+            el.dataset.f3rName = addr;
+        }
+        if (existing) return;
+        nameFor(addr).then(function (name) {
+            if (!name || el.dataset.f3rName !== addr || el.querySelector(':scope > .f3r-name')) return;
+            var s = document.createElement('span');
+            s.className = 'f3r-name';
+            s.textContent = ' · ' + name;
+            el.append(s);
+        });
+    }
+
+    function hashAddress() {
+        var m = /[#&]address=(0x[0-9a-f]{40})(?:&|$)/i.exec(location.hash);
+        return m ? m[1].toLowerCase() : null;
+    }
+    function ownText(el) {
+        return el.firstChild && el.firstChild.nodeType === 3 ? el.firstChild.textContent.trim() : '';
+    }
+
+    function scan() {
+        // Artwork details: owner and artist addresses, never contract addresses.
+        document.querySelectorAll('dd').forEach(function (dd) {
+            var t = ownText(dd), dt = dd.previousElementSibling;
+            if (FULL.test(t) && !(dt && /contract/i.test(dt.textContent))) label(dd, t.toLowerCase());
+        });
+        // Breadcrumb for an opened wallet: shortened address, full one in the URL.
+        var full = hashAddress();
+        if (!full) return;
+        document.querySelectorAll('nav button').forEach(function (b) {
+            var m = SHORT.exec(ownText(b));
+            if (m && full.indexOf(m[1].toLowerCase()) === 0 && full.slice(-m[2].length) === m[2].toLowerCase()) label(b, full);
+        });
+    }
+
+    var queued = false;
+    function later() {
+        if (queued) return;
+        queued = true;
+        setTimeout(function () { queued = false; scan(); }, 300);
+    }
+    function start() {
+        new MutationObserver(later).observe(document.body, { childList: true, subtree: true, characterData: true });
+        addEventListener('hashchange', later);
+        later();
+    }
+    if (document.body) start(); else addEventListener('DOMContentLoaded', start);
+})();

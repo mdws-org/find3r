@@ -1996,3 +1996,9 @@ textarea {
   overflow: hidden;
   transform-origin: 0 0;
 }
+
+/* ENS primary name appended after an address (names.js). */
+.f3r-name {
+  color: var(--muted);
+  font-weight: 400;
+}
