@@ -4279,13 +4279,154 @@ function abxOwnersIndex(fetcher) {
   abxOwnersCache = { value, until: Date.now() + 3e5 };
   return value;
 }
+// Cross-visit cache: collection classes (30 days, 4,096 entries) and the ABX collection list.
+// It uses its own database because viewer.js opens find3r.packages.v1 at a fixed version.
+// Nothing is stored on shared gateway origins or inside an embedded copy, and every failure means "no cache".
+const CROSS_VISIT_DB = "find3r.cache.v1",
+  CLASS_TTL_MS = 30 * 864e5,
+  CLASS_MAX = 4096,
+  LIST_MAX_CHARS = 1048576,
+  MULTICALL3_CHAINS = new Set([1, 8453, 42161, 84532]);
+function validClass(rec, now = Date.now()) {
+  if (!rec || typeof rec != "object" || !(rec.created <= now + 6e4 && now - rec.created < CLASS_TTL_MS)) return;
+  if (rec.standard !== "erc721" && rec.standard !== "erc1155") return;
+  if (rec.name !== void 0 && (typeof rec.name != "string" || !rec.name || rec.name.length > 160)) return;
+  if (rec.abxVersion !== void 0 && !(Number.isInteger(rec.abxVersion) && rec.abxVersion > 0 && rec.abxVersion < 65536))
+    return;
+  return {
+    standard: rec.standard,
+    ...(rec.name ? { name: rec.name } : {}),
+    ...(rec.abxVersion ? { abxVersion: rec.abxVersion } : {}),
+  };
+}
+const crossVisit = {
+  db: void 0,
+  allowed() {
+    try {
+      return typeof indexedDB < "u" && !globalThis.__find3rLocation && !dt(new URL(location.href));
+    } catch {
+      return !1;
+    }
+  },
+  open() {
+    if (!this.allowed()) return Promise.resolve(null);
+    return (this.db ||= new Promise((resolve) => {
+      try {
+        const req = indexedDB.open(CROSS_VISIT_DB, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          db.objectStoreNames.contains("classes") ||
+            db.createObjectStore("classes", { keyPath: "key" }).createIndex("created", "created");
+          db.objectStoreNames.contains("lists") || db.createObjectStore("lists", { keyPath: "key" });
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          db.onversionchange = () => {
+            db.close();
+            this.db = void 0;
+          };
+          resolve(db);
+        };
+        req.onerror = req.onblocked = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    }));
+  },
+  async run(stores, mode, fn) {
+    try {
+      const db = await this.open();
+      if (!db) return;
+      return await new Promise((resolve) => {
+        const tx = db.transaction(stores, mode);
+        let out;
+        try {
+          out = fn(tx);
+        } catch {
+          tx.abort();
+        }
+        tx.oncomplete = () => resolve(out);
+        tx.onerror = tx.onabort = () => resolve(void 0);
+      });
+    } catch {
+      return;
+    }
+  },
+  async classes(chainId, contracts) {
+    const out = new Map(),
+      now = Date.now();
+    if (!contracts.length) return out;
+    await this.run("classes", "readonly", (tx) => {
+      const s = tx.objectStore("classes");
+      for (const c of new Set(contracts.map((x) => x.toLowerCase()))) {
+        const r = s.get(Number(chainId) + ":" + c);
+        r.onsuccess = () => {
+          const v = validClass(r.result, now);
+          v && out.set(c, v);
+        };
+      }
+    });
+    return out;
+  },
+  async putClasses(chainId, entries) {
+    const now = Date.now(),
+      recs = entries.flatMap(([contract, value]) => {
+        const rec = { ...value, key: Number(chainId) + ":" + contract.toLowerCase(), created: now };
+        return wt.test(contract) && validClass(rec, now) ? [rec] : [];
+      });
+    if (!recs.length) return;
+    await this.run("classes", "readwrite", (tx) => {
+      const s = tx.objectStore("classes");
+      for (const rec of recs) s.put(rec);
+      const n = s.count();
+      n.onsuccess = () => {
+        let extra = n.result - CLASS_MAX;
+        if (extra <= 0) return;
+        const cur = s.index("created").openCursor();
+        cur.onsuccess = () => {
+          const c = cur.result;
+          c && extra-- > 0 && (c.delete(), c.continue());
+        };
+      };
+    });
+  },
+  async list(key) {
+    const rec = await this.run("lists", "readonly", (tx) => {
+      const r = tx.objectStore("lists").get(key);
+      const box = {};
+      r.onsuccess = () => (box.value = r.result);
+      return box;
+    });
+    const v = rec?.value;
+    return v && typeof v.fetched == "number" && v.fetched <= Date.now() + 6e4 && Array.isArray(v.value)
+      ? { value: v.value, fetched: v.fetched }
+      : void 0;
+  },
+  async putList(key, value) {
+    try {
+      if (!Array.isArray(value) || JSON.stringify(value).length > LIST_MAX_CHARS) return;
+    } catch {
+      return;
+    }
+    await this.run("lists", "readwrite", (tx) => {
+      tx.objectStore("lists").put({ key, value, fetched: Date.now() });
+    });
+  },
+  async clear() {
+    await this.run(["classes", "lists"], "readwrite", (tx) => {
+      tx.objectStore("classes").clear();
+      tx.objectStore("lists").clear();
+    });
+  },
+};
+const ABX_LIST_FRESH_MS = 36e5;
 var dn = class {
   constructor({ fetcher: t = (...n) => globalThis.fetch(...n), content: r = {} } = {}) {
     ((this.fetcher = t), (this.content = r), (this.cache = new Map()));
   }
-  async json(t, r = 8 * 1024 * 1024) {
+  async json(t, r = 8 * 1024 * 1024, fresh = !1) {
     let n = this.cache.get(t);
-    if (n && n.until > Date.now()) return n.value;
+    if (!fresh && n && n.until > Date.now()) return n.value;
     let o = await this.fetcher(yd + t, { credentials: "omit", redirect: "error", signal: AbortSignal.timeout(2e4) });
     if (!o.ok) throw new Error("ABX couldn\u2019t load right now. Please try again.");
     let a = await o.text();
@@ -4293,8 +4434,36 @@ var dn = class {
     let i = JSON.parse(a);
     return (this.cache.set(t, { value: i, until: Date.now() + 6e4 }), i);
   }
+  // The project list is reused across visits: a copy younger than an hour answers at once and is
+  // refreshed in the background; an older copy answers only when the network fetch fails.
+  async projects() {
+    const path = "/api/projects",
+      mem = this.cache.get(path);
+    if (mem && mem.until > Date.now()) return mem.value;
+    this.storedProjects ||= crossVisit.list("abx-projects");
+    const stored = await this.storedProjects;
+    const fetchAndStore = async () => {
+      const value = await this.json(path, LIST_MAX_CHARS, !0);
+      Array.isArray(value) && value.length <= 5e3 && (await crossVisit.putList("abx-projects", value));
+      this.storedProjects = Promise.resolve({ value, fetched: Date.now() });
+      return value;
+    };
+    if (stored && Date.now() - stored.fetched < ABX_LIST_FRESH_MS) {
+      this.cache.set(path, { value: stored.value, until: Date.now() + 6e4 });
+      this.refreshing ||= fetchAndStore()
+        .catch(() => {})
+        .finally(() => (this.refreshing = void 0));
+      return stored.value;
+    }
+    try {
+      return await fetchAndStore();
+    } catch (e) {
+      if (stored) return stored.value;
+      throw e;
+    }
+  }
   async collections() {
-    let t = await this.json("/api/projects", 1048576);
+    let t = await this.projects();
     if (!Array.isArray(t) || t.length > 5e3) throw new Error("ABX returned an unexpected collection list.");
     return t
       .filter((r) => ss.includes(r.chainId) && wt.test(r.address))
@@ -5090,10 +5259,11 @@ var ls = "0xca11bde05977b3631167028862be2a173976ca11",
 async function us(e, t) {
   let r = new Map(),
     n = new Set(),
-    o = !1;
-  try {
-    o = (await e.request("eth_getCode", [ls, e.block])) !== "0x";
-  } catch {}
+    o = MULTICALL3_CHAINS.has(Number(e.chainId));
+  if (!o)
+    try {
+      o = (await e.request("eth_getCode", [ls, e.block])) !== "0x";
+    } catch {}
   for (let a = 0; a < t.length; a += 32) {
     let i = t.slice(a, a + 32);
     if (o)
@@ -5314,6 +5484,8 @@ async function Pd(e, t, r) {
   if (!Bd.test(r)) throw new Error("Enter a contract address.");
   if (((r = r.toLowerCase()), await e.pin(t), Fo(t, r)))
     return { chainId: 1, contract: He, name: "CryptoPunks", standard: "punks", adapter: "nft", direct: !0 };
+  let known = (await crossVisit.classes(t, [r])).get(r);
+  if (known) return collectionClass(t, r, known.standard, known.name, known.abxVersion || 0);
   let n = await e.request("eth_getCode", [r, e.block]);
   if (n === "0x" || Ld(n)) return;
   let o = xo(t, r);
@@ -5323,16 +5495,24 @@ async function Pd(e, t, r) {
     s = await j(e, r, "function name() view returns (string)"),
     c = await j(e, r, "function abxVersion() view returns (uint16)"),
     d = a ? "erc721" : i ? "erc1155" : void 0,
-    l = d ? (c > 0n ? "abx" : "nft") : "contract",
-    f = Number(t) === 1 && r === tr ? "The Vessel Sequences" : void 0;
+    v = c > 0n ? Number(c) : 0,
+    name = typeof s == "string" && s ? s.slice(0, 160) : void 0;
+  d &&
+    crossVisit.putClasses(t, [
+      [r, { standard: d, ...(name ? { name } : {}), ...(v ? { abxVersion: v } : {}) }],
+    ]);
+  return collectionClass(t, r, d, s, v);
+}
+function collectionClass(t, r, d, s, v) {
+  let f = Number(t) === 1 && r === tr ? "The Vessel Sequences" : void 0;
   return {
     contract: r,
     chainId: t,
     name: String(s || f || "Collection " + r.slice(0, 8) + "\u2026").slice(0, 160),
     unnamed: !s && !f,
     standard: d,
-    adapter: l,
-    ...(c > 0n ? { abxVersion: Number(c) } : {}),
+    adapter: d ? (v > 0 ? "abx" : "nft") : "contract",
+    ...(v > 0 ? { abxVersion: v } : {}),
     direct: !0,
   };
 }
@@ -5393,8 +5573,9 @@ var bs = en,
       if ((r || ((r = this.rpcFor(o.chainId)), await r.pin(o.chainId)), Fo(o.chainId, o.contract)))
         return ps(r, o.tokenId);
       if (ms(o.chainId, o.contract)) return gs(r, o.tokenId);
-      let [a, i, s] = n
-        ? [n.standard === "erc721", n.standard === "erc1155", BigInt(n.abxVersion || 0)]
+      let cachedClass = n || (xo(o.chainId, o.contract) ? void 0 : (await crossVisit.classes(o.chainId, [o.contract])).get(o.contract.toLowerCase()));
+      let [a, i, s] = cachedClass
+        ? [cachedClass.standard === "erc721", cachedClass.standard === "erc1155", BigInt(cachedClass.abxVersion || 0)]
         : xo(o.chainId, o.contract)
           ? [!0, !1, 0n]
           : await Promise.all([
@@ -5674,6 +5855,19 @@ var Te = (e) => e.chainId + ":" + e.contract.toLowerCase(),
         for (let v of [...new Set(b.map((E) => E.chainId))]) {
           let E = b.filter((S) => S.chainId === v),
             $ = E.filter((S) => !(this.checked.get(Te(S))?.until > Date.now()));
+          if ($.length) {
+            const known = await crossVisit.classes(
+              v,
+              $.map((x) => x.contract),
+            );
+            for (const x of $) {
+              const k = known.get(x.contract.toLowerCase());
+              k &&
+                (this.checked.size >= 4096 && this.checked.delete(this.checked.keys().next().value),
+                this.checked.set(Te(x), { until: Date.now() + 6e4, value: k.abxVersion ? k : void 0 }));
+            }
+            $ = $.filter((x) => !known.has(x.contract.toLowerCase()));
+          }
           if ($.length)
             try {
               let S = this.rpcFor(v);
@@ -5683,6 +5877,7 @@ var Te = (e) => e.chainId + ":" + e.contract.toLowerCase(),
                 $.map((x) => x.contract),
               );
               w += L.failed.size;
+              const keep = [];
               for (let x of $) {
                 if (L.failed.has(x.contract)) continue;
                 let R = L.versions.get(x.contract),
@@ -5696,15 +5891,19 @@ var Te = (e) => e.chainId + ":" + e.contract.toLowerCase(),
                         "0xd9b67a26",
                       ]);
                     if (V || An) {
-                      let Ke;
+                      let Ke,
+                        named = !0;
                       try {
                         Ke = await j(S, x.contract, "function name() view returns (string)");
-                      } catch {}
+                      } catch {
+                        named = !1;
+                      }
                       H = {
                         abxVersion: R,
                         standard: V ? "erc721" : "erc1155",
                         ...(Ke ? { name: String(Ke).slice(0, 160) } : {}),
                       };
+                      named && keep.push([x.contract, H]);
                     }
                   } catch {
                     w++;
@@ -5713,6 +5912,7 @@ var Te = (e) => e.chainId + ":" + e.contract.toLowerCase(),
                 (this.checked.size >= 4096 && this.checked.delete(this.checked.keys().next().value),
                   this.checked.set(Te(x), { until: Date.now() + 6e4, value: H }));
               }
+              crossVisit.putClasses(v, keep);
             } catch {
               w += $.length;
             }
@@ -7283,7 +7483,11 @@ p("#settings-form").addEventListener("submit", (e) => {
 p("#setup-connection").addEventListener("click", Rs);
 p("#clear-cache").addEventListener("click", async () => {
   try {
-    (await gn(), Ve.clear(), (p("#clear-cache").textContent = "Local copies cleared"));
+    (await crossVisit.clear(),
+      (ar.storedProjects = void 0),
+      await gn(),
+      Ve.clear(),
+      (p("#clear-cache").textContent = "Local copies cleared"));
   } catch (e) {
     p("#settings-error").textContent = e.message;
   }

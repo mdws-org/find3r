@@ -4015,10 +4015,111 @@ async function M(e, t, r, n = []) {
     throw o;
   }
 }
+// Collection classes shared with the browser page (app.js) through the find3r.cache.v1 database:
+// positive ERC-721/1155 results with optional name and abxVersion, 30 days, at most 4,096 entries.
+// Nothing is stored on shared gateway origins or inside an embedded copy; every failure means "no cache".
+const classCache = {
+  ttl: 30 * 864e5,
+  max: 4096,
+  db: void 0,
+  valid(rec, now = Date.now()) {
+    if (!rec || typeof rec != "object" || !(rec.created <= now + 6e4 && now - rec.created < this.ttl)) return;
+    if (rec.standard !== "erc721" && rec.standard !== "erc1155") return;
+    if (rec.name !== void 0 && (typeof rec.name != "string" || !rec.name || rec.name.length > 160)) return;
+    if (
+      rec.abxVersion !== void 0 &&
+      !(Number.isInteger(rec.abxVersion) && rec.abxVersion > 0 && rec.abxVersion < 65536)
+    )
+      return;
+    return {
+      standard: rec.standard,
+      ...(rec.name ? { name: rec.name } : {}),
+      ...(rec.abxVersion ? { abxVersion: rec.abxVersion } : {}),
+    };
+  },
+  open() {
+    try {
+      if (typeof indexedDB > "u" || globalThis.__find3rLocation || he(new URL(location.href)))
+        return Promise.resolve(null);
+    } catch {
+      return Promise.resolve(null);
+    }
+    return (this.db ||= new Promise((resolve) => {
+      try {
+        const req = indexedDB.open("find3r.cache.v1", 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          db.objectStoreNames.contains("classes") ||
+            db.createObjectStore("classes", { keyPath: "key" }).createIndex("created", "created");
+          db.objectStoreNames.contains("lists") || db.createObjectStore("lists", { keyPath: "key" });
+        };
+        req.onsuccess = () => {
+          const db = req.result;
+          db.onversionchange = () => {
+            db.close();
+            this.db = void 0;
+          };
+          resolve(db);
+        };
+        req.onerror = req.onblocked = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    }));
+  },
+  async run(mode, fn) {
+    try {
+      const db = await this.open();
+      if (!db) return;
+      return await new Promise((resolve) => {
+        const tx = db.transaction("classes", mode);
+        let out;
+        try {
+          out = fn(tx.objectStore("classes"));
+        } catch {
+          tx.abort();
+        }
+        tx.oncomplete = () => resolve(out);
+        tx.onerror = tx.onabort = () => resolve(void 0);
+      });
+    } catch {
+      return;
+    }
+  },
+  async get(chainId, contract) {
+    const box = await this.run("readonly", (s) => {
+      const b = {},
+        r = s.get(Number(chainId) + ":" + contract.toLowerCase());
+      r.onsuccess = () => (b.value = r.result);
+      return b;
+    });
+    return this.valid(box?.value);
+  },
+  async put(chainId, contract, value) {
+    const now = Date.now(),
+      rec = { ...value, key: Number(chainId) + ":" + contract.toLowerCase(), created: now };
+    if (!Qs.test(contract) || !this.valid(rec, now)) return;
+    await this.run("readwrite", (s) => {
+      s.put(rec);
+      const n = s.count();
+      n.onsuccess = () => {
+        let extra = n.result - this.max;
+        if (extra <= 0) return;
+        const cur = s.index("created").openCursor();
+        cur.onsuccess = () => {
+          const c = cur.result;
+          c && extra-- > 0 && (c.delete(), c.continue());
+        };
+      };
+    });
+  },
+};
 async function tc(e, t, r) {
   if (!Qs.test(r)) throw new Error("Enter a contract address.");
   if (((r = r.toLowerCase()), await e.pin(t), Kn(t, r)))
     return { chainId: 1, contract: be, name: "CryptoPunks", standard: "punks", adapter: "nft", direct: !0 };
+  let known = await classCache.get(t, r);
+  if (known) return collectionClass(t, r, known.standard, known.name, known.abxVersion || 0);
   let n = await e.request("eth_getCode", [r, e.block]);
   if (n === "0x" || ec(n)) return;
   let o = Hr(t, r);
@@ -4028,16 +4129,21 @@ async function tc(e, t, r) {
     s = await M(e, r, "function name() view returns (string)"),
     c = await M(e, r, "function abxVersion() view returns (uint16)"),
     d = a ? "erc721" : i ? "erc1155" : void 0,
-    l = d ? (c > 0n ? "abx" : "nft") : "contract",
-    m = Number(t) === 1 && r === V ? "The Vessel Sequences" : void 0;
+    v = c > 0n ? Number(c) : 0,
+    name = typeof s == "string" && s ? s.slice(0, 160) : void 0;
+  d && classCache.put(t, r, { standard: d, ...(name ? { name } : {}), ...(v ? { abxVersion: v } : {}) });
+  return collectionClass(t, r, d, s, v);
+}
+function collectionClass(t, r, d, s, v) {
+  let m = Number(t) === 1 && r === V ? "The Vessel Sequences" : void 0;
   return {
     contract: r,
     chainId: t,
     name: String(s || m || "Collection " + r.slice(0, 8) + "\u2026").slice(0, 160),
     unnamed: !s && !m,
     standard: d,
-    adapter: l,
-    ...(c > 0n ? { abxVersion: Number(c) } : {}),
+    adapter: d ? (v > 0 ? "abx" : "nft") : "contract",
+    ...(v > 0 ? { abxVersion: v } : {}),
     direct: !0,
   };
 }
@@ -4098,8 +4204,9 @@ var fa = vr,
       if ((r || ((r = this.rpcFor(o.chainId)), await r.pin(o.chainId)), Kn(o.chainId, o.contract)))
         return Qi(r, o.tokenId);
       if (ca(o.chainId, o.contract)) return la(r, o.tokenId);
-      let [a, i, s] = n
-        ? [n.standard === "erc721", n.standard === "erc1155", BigInt(n.abxVersion || 0)]
+      let cachedClass = n || (Hr(o.chainId, o.contract) ? void 0 : await classCache.get(o.chainId, o.contract));
+      let [a, i, s] = cachedClass
+        ? [cachedClass.standard === "erc721", cachedClass.standard === "erc1155", BigInt(cachedClass.abxVersion || 0)]
         : Hr(o.chainId, o.contract)
           ? [!0, !1, 0n]
           : await Promise.all([
