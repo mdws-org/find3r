@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>What changed in this fork of find3r</title>
+    <link rel="stylesheet" href="./app.css" />
+    <link rel="stylesheet" href="./theme-dark.css" />
+    <script src="./theme.js"></script>
+    <link rel="icon" href="./favicon.svg" />
+  </head>
+  <body class="learn-body">
+    <div class="fork-banner" role="note">A fork of find3r with faster loading, ENS v2 names and more. <a href="./changes.html">What changed</a> &middot; The original is <a href="https://find3r.app/">find3r.app</a>.</div>
+    <header class="desktop-header">
+      <a class="wordmark" href="./">find<span>3</span>r.</a><span>A fork of find3r.</span
+      ><a href="./">Back to your folders ↗</a>
+      <button type="button" id="theme-toggle"></button>
+    </header>
+    <main class="learn">
+      <span class="eyebrow">WHAT CHANGED</span>
+      <h1>This fork of find3r</h1>
+      <p>
+        find3r is Snowfro's onchain file browser; the original is at
+        <a href="https://find3r.app/">find3r.app</a>. This copy started from find3r's files exactly as published
+        onchain (BAMFS on Base Sepolia, version 5) and changes the things listed below, with Snowfro's OK. The
+        full diff against that untouched copy is on GitHub:
+        <a href="https://github.com/mdws-org/find3r/compare/upstream...main">upstream...main</a>.
+      </p>
+
+      <h2 id="ens">ENS names that work</h2>
+      <p>
+        find3r looked names up in the ENS v1 registry, so names on ENS v2 (live on mainnet since October 27, 2026)
+        and names served offchain failed with "no direct onchain resolver". This fork asks the ENS Universal
+        Resolver instead, which answers for v1, v2 and offchain names (CCIP-Read, EIP-3668). thebenmeadows.eth,
+        nick.eth and jesse.base.eth all open here.
+        <a href="https://github.com/mdws-org/find3r/commit/3ced3fb">Commit</a>
+      </p>
+
+      <h2 id="names">Any ENS name in Go to</h2>
+      <p>
+        The address box took only names ending in .eth. It now takes any ENS name, so names like name.cb.id work
+        too. <a href="https://github.com/mdws-org/find3r/commit/38c0638">Commit</a>
+      </p>
+
+      <h2 id="speed">Wallets load about 3x faster</h2>
+      <p>
+        Outside find3r.app, the reader waited 250 ms between RPC requests and re-read each chain's id and block
+        number on every request. Both are gone: requests run 6 at a time, a rate-limited request is retried, and one
+        block is pinned per chain for a page load. A wallet that took 15.4 s and 129 requests to load now takes about
+        5 s and 113 requests (headless Chromium, all chains, three runs).
+        <a href="https://github.com/mdws-org/find3r/commit/d61bb1a">Commit</a>
+      </p>
+
+      <h2 id="primary-names">Names next to addresses</h2>
+      <p>
+        An opened wallet and an artwork's owner and artist show the address's ENS primary name, for example
+        "0x98f1bd…14934 · thebenmeadows.eth". A name is shown only if it points back to the same address. Lookups use
+        the Ethereum connection from Settings when you have set one. Contract addresses never get a name.
+        <a href="https://github.com/mdws-org/find3r/commit/9de2efb">Commit</a>
+      </p>
+
+      <h2 id="look">The thebenmeadows.com look, light and dark</h2>
+      <p>
+        Colors, type (Public Sans) and the flat style of thebenmeadows.com, with a dark theme that follows your system
+        setting and a Light/Dark button in the header that remembers your choice.
+        <a href="https://github.com/mdws-org/find3r/commit/cc41c4a">Commit</a>
+      </p>
+
+      <h2 id="formatting">Readable source</h2>
+      <p>
+        find3r ships minified bundles. The first commit after the untouched copy only reformats them (Prettier), so
+        every change above is a readable diff.
+        <a href="https://github.com/mdws-org/find3r/commit/5b992c5">Commit</a>
+      </p>
+
+      <h2 id="contact">Problems</h2>
+      <p>
+        Problems with this copy go to
+        <a href="https://github.com/mdws-org/find3r/issues">github.com/mdws-org/find3r/issues</a>, not to find3r.
+      </p>
+    </main>
+  </body>
+</html>
