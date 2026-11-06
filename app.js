@@ -2208,8 +2208,8 @@ var W = class extends Error {},
       {
         onCall: r = () => {},
         fetcher: n = (...i) => globalThis.fetch(...i),
-        intervalMs: o = 250,
-        concurrency: a = 3,
+        intervalMs: o = 0,
+        concurrency: a = 6,
       } = {},
     ) {
       ((this.url = Kt(t)),
@@ -2217,7 +2217,7 @@ var W = class extends Error {},
         (this.fetcher = n),
         (this.id = 0),
         (this.intervalMs = o),
-        (this.concurrency = Math.max(1, Math.min(4, a))),
+        (this.concurrency = Math.max(1, Math.min(8, a))),
         (this.active = 0),
         (this.queue = []));
     }
@@ -2236,18 +2236,20 @@ var W = class extends Error {},
         this.onCall({ method: t, params: r }));
       let a, i;
       try {
-        if (
-          ((a = await this.fetcher(this.url, {
+        // A rate-limited endpoint (HTTP 429) gets two more tries, 0.4 s then 0.8 s later.
+        for (let attempt = 0; ; attempt++) {
+          a = await this.fetcher(this.url, {
             method: "POST",
             redirect: "error",
             credentials: "omit",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ jsonrpc: "2.0", id: o, method: t, params: r }),
             signal: AbortSignal.timeout(3e4),
-          })),
-          !a.ok)
-        )
-          throw new Error();
+          });
+          if (a.status !== 429 || attempt >= 2) break;
+          await new Promise((s) => setTimeout(s, 400 * (attempt + 1)));
+        }
+        if (!a.ok) throw new Error();
         let s = a.body.getReader(),
           c = [],
           d = 0;
@@ -2300,10 +2302,20 @@ var W = class extends Error {},
         throw Object.assign(new Error(`RPC ${t} returned an error or invalid response.`), { rpcFailure: !0 });
       return i.result;
     }
+    // Every client for one endpoint shares its pin: the chain id is checked once, and a pinned
+    // block is reused for PIN_TTL_MS so a page load reads one consistent block per chain.
+    static pins = new Map();
+    static PIN_TTL_MS = 15e3;
     async pin(t) {
+      let c = Xt.pins.get(this.url);
+      if (c && c.chainId === Number(t) && Date.now() - c.at < Xt.PIN_TTL_MS) {
+        ((this.chainId = c.chainId), (this.block = c.block));
+        return;
+      }
       if (((this.block = void 0), (this.chainId = void 0), BigInt(await this.request("eth_chainId")) !== BigInt(t)))
         throw new Error("RPC is on the wrong chain.");
       ((this.chainId = Number(t)), (this.block = await this.request("eth_blockNumber")));
+      Xt.pins.set(this.url, { chainId: this.chainId, block: this.block, at: Date.now() });
     }
     async call(t, r, n = [], { gas: o } = {}) {
       if (!this.block) throw new Error("Pin the RPC block before reading.");
@@ -2590,7 +2602,6 @@ function ja(e, t, r = new URL(globalThis.location.href)) {
   let n = Hc(e, t, r),
     o = Zt(r) && n === new URL("/rpc/" + e, r).href;
   return new Xt(n, {
-    intervalMs: o ? 0 : 250,
     ...(o ? { fetcher: (a, i) => globalThis.fetch(a, { ...i, body: JSON.stringify(Oa(i.body)) }) } : {}),
   });
 }
