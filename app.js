@@ -2458,8 +2458,8 @@ function ct(e) {
   )
     throw new Error("Choose a supported BAMFS network.");
   let r = String(e.value || "").trim();
-  if (!/^0x[0-9a-f]{40}$/i.test(r) && !(e.kind === "wallet" && /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+eth$/i.test(r)))
-    throw new Error("Enter an Ethereum address or an ASCII .eth name.");
+  if (!/^0x[0-9a-f]{40}$/i.test(r) && !(e.kind === "wallet" && /^(?:_*[a-z0-9-]+\.)+[a-z0-9-]+$/i.test(r)))
+    throw new Error("Enter an Ethereum address or an ENS name (plain ASCII).");
   if (
     e.kind === "collection" &&
     !["artblocks", "abx", "nft", "contract"].includes(e.adapter) &&
@@ -5729,7 +5729,7 @@ async function xs(e, { chainId: t, holdings: r = !1, rpcFor: n, artblocks: o, ab
     kind: "wallet",
     value: e,
     chainId: t || 0,
-    label: e.includes(".eth") ? e : s.slice(0, 8) + "\u2026" + s.slice(-5),
+    label: !/^0x[0-9a-f]{40}$/i.test(e) ? e : s.slice(0, 8) + "\u2026" + s.slice(-5),
     deploymentId: d.id,
     ...(r ? { holdings: !0 } : {}),
   };
@@ -7100,7 +7100,7 @@ p("#folder-form").addEventListener("submit", async (e) => {
           ? ct({
               kind: "wallet",
               value: n,
-              label: o || (n.toLowerCase().endsWith(".eth") ? n : Nd(n)),
+              label: o || (!/^0x[0-9a-f]{40}$/i.test(n) ? n : Nd(n)),
               chainId: 0,
               holdings: !0,
               deploymentId: oe[0].id,

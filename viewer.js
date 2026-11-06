@@ -3288,8 +3288,8 @@ function Ls(e) {
   )
     throw new Error("Choose a supported BAMFS network.");
   let r = String(e.value || "").trim();
-  if (!/^0x[0-9a-f]{40}$/i.test(r) && !(e.kind === "wallet" && /^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+eth$/i.test(r)))
-    throw new Error("Enter an Ethereum address or an ASCII .eth name.");
+  if (!/^0x[0-9a-f]{40}$/i.test(r) && !(e.kind === "wallet" && /^(?:_*[a-z0-9-]+\.)+[a-z0-9-]+$/i.test(r)))
+    throw new Error("Enter an Ethereum address or an ENS name (plain ASCII).");
   if (
     e.kind === "collection" &&
     !["artblocks", "abx", "nft", "contract"].includes(e.adapter) &&
