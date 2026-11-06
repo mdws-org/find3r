@@ -3042,29 +3042,49 @@ var Yr = class {
       (super("This file is not in the published app."), (this.name = "MissingFile"));
     }
   };
-var Gr = 40n,
-  Va = "0x" + "00".repeat(20),
-  Qc = "0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e";
+var Gr = 40n;
+// ENS names resolve through the ENS Universal Resolver (ens.js), which covers ENS v1, v2 and
+// offchain (CCIP-Read) names. The RPC client below drops revert data, which CCIP-Read needs, so
+// these calls go to the same endpoint directly, at the block the client pinned.
+const ensResolvers = new WeakMap();
+const OFFCHAIN_LOOKUP = /0x556f1830[0-9a-f]*/i;
+function ensEthCall(t) {
+  return async (to, data) => {
+    let res;
+    try {
+      res = await (t.fetcher || globalThis.fetch)(t.url, {
+        method: "POST",
+        redirect: "error",
+        credentials: "omit",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to, data }, t.block || "latest"] }),
+        signal: AbortSignal.timeout(3e4),
+      });
+    } catch {
+      throw new Error("ENS lookup could not reach the RPC.");
+    }
+    if (!res.ok) throw new Error(`ENS lookup failed (HTTP ${res.status}).`);
+    const j = await res.json();
+    if (j.error) {
+      const err = new Error(String(j.error.message || "ENS lookup failed."));
+      const raw = typeof j.error.data === "string" ? j.error.data : JSON.stringify(j.error.data ?? "");
+      const m = /^0x[0-9a-f]*$/i.test(raw) ? [raw] : OFFCHAIN_LOOKUP.exec(raw) || /0x[0-9a-f]{8,}/i.exec(raw);
+      if (m) err.data = m[0];
+      throw err;
+    }
+    if (typeof j.result !== "string" || !/^0x[0-9a-f]*$/i.test(j.result)) throw new Error("ENS lookup got a malformed reply.");
+    return j.result;
+  };
+}
+function ensFor(t) {
+  let r = ensResolvers.get(t);
+  if (!r) ensResolvers.set(t, (r = globalThis.makeEnsResolver(ensEthCall(t), globalThis.keccak256)));
+  return r;
+}
 async function Zr(e, t) {
   if (/^0x[0-9a-f]{40}$/i.test(e)) return e.toLowerCase();
-  let r = e.toLowerCase();
-  if (!/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+eth$/.test(r))
-    throw new Error("Enter an Ethereum address or an ASCII .eth name.");
   await t.pin(1);
-  let n = "0x" + "00".repeat(32);
-  for (let i of r.split(".").reverse()) n = O(G([n, O(te(i))]));
-  let o = await t.call(Qc, "function resolver(bytes32) view returns (address)", [n]);
-  if (o.toLowerCase() === Va) throw new Error("This ENS name has no direct onchain resolver. Use its wallet address.");
-  let a;
-  try {
-    a = await t.call(o, "function addr(bytes32) view returns (address)", [n]);
-  } catch {
-    throw new Error(
-      "The ENS address could not be read directly. Offchain and wildcard resolvers are not supported yet; use the wallet address.",
-    );
-  }
-  if (a.toLowerCase() === Va) throw new Error("No Ethereum address is set for this ENS name.");
-  return a.toLowerCase();
+  return (await ensFor(t).resolve(e)).toLowerCase();
 }
 var bo = class {
   constructor(t, r) {
