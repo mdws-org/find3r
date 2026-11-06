@@ -4887,17 +4887,10 @@ var pn = class {
           let h = this.rpcFor(f);
           try {
             await h.pin(f);
-            let w = await X(
+            let w = await familiarBalances(
+              h,
               er.filter((y) => y.chainId === f && y.standard !== "erc1155"),
-              1,
-              async (y) => {
-                try {
-                  let b = await h.call(y.contract, "function balanceOf(address) view returns (uint256)", [t]);
-                  return { status: "fulfilled", value: b ? { ...y, count: Number(b) } : void 0 };
-                } catch {
-                  return { status: "rejected" };
-                }
-              },
+              t,
             );
             return (
               m.push(...w.flatMap((y) => (y.status === "fulfilled" && y.value ? [y.value] : []))),
@@ -5009,6 +5002,41 @@ var pn = class {
     (this.cache.clear(), this.pages.clear(), this.pending.clear());
   }
 };
+// balanceOf(owner) on each familiar collection: batches of 32 through Multicall3 at the pinned block,
+// one call at a time when a batch fails. Each result is {status, value} as the caller expects.
+const BALANCE_OF = "function balanceOf(address) view returns (uint256)";
+async function familiarBalances(rpc, collections, owner) {
+  const one = async (y) => {
+    try {
+      let b = await rpc.call(y.contract, BALANCE_OF, [owner]);
+      return { status: "fulfilled", value: b ? { ...y, count: Number(b) } : void 0 };
+    } catch {
+      return { status: "rejected" };
+    }
+  };
+  const callData = Oe({ abi: ve([BALANCE_OF]), functionName: "balanceOf", args: [owner] });
+  const out = [];
+  for (let a = 0; a < collections.length; a += 32) {
+    const batch = collections.slice(a, a + 32);
+    try {
+      const res = await rpc.call(
+        ls,
+        "function aggregate3((address target,bool allowFailure,bytes callData)[]) view returns ((bool success,bytes returnData)[])",
+        [batch.map((y) => ({ target: y.contract, allowFailure: !0, callData }))],
+        { gas: 5000000n },
+      );
+      if (!Array.isArray(res) || res.length !== batch.length) throw Error("Incomplete balance checks.");
+      res.forEach((c, d) => {
+        if (!c.success || !/^0x[0-9a-f]{64}$/i.test(c.returnData)) return out.push({ status: "rejected" });
+        const n = BigInt(c.returnData);
+        out.push({ status: "fulfilled", value: n ? { ...batch[d], count: Number(n) } : void 0 });
+      });
+    } catch {
+      for (const y of batch) out.push(await one(y));
+    }
+  }
+  return out;
+}
 var ls = "0xca11bde05977b3631167028862be2a173976ca11",
   Ed = ve(["function abxVersion() view returns (uint16)"]),
   Sd = Oe({ abi: Ed, functionName: "abxVersion" }),
