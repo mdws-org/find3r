@@ -4312,12 +4312,13 @@ const crossVisit = {
     if (!this.allowed()) return Promise.resolve(null);
     return (this.db ||= new Promise((resolve) => {
       try {
-        const req = indexedDB.open(CROSS_VISIT_DB, 1);
+        const req = indexedDB.open(CROSS_VISIT_DB, 2);
         req.onupgradeneeded = () => {
           const db = req.result;
           db.objectStoreNames.contains("classes") ||
             db.createObjectStore("classes", { keyPath: "key" }).createIndex("created", "created");
           db.objectStoreNames.contains("lists") || db.createObjectStore("lists", { keyPath: "key" });
+          db.objectStoreNames.contains("names") || db.createObjectStore("names", { keyPath: "key" });
         };
         req.onsuccess = () => {
           const db = req.result;
@@ -4412,13 +4413,36 @@ const crossVisit = {
       tx.objectStore("lists").put({ key, value, fetched: Date.now() });
     });
   },
+  // ENS primary names for saved wallets (names.js): a found name is kept a day, "no name" an hour.
+  async name(addr) {
+    const rec = await this.run("names", "readonly", (tx) => {
+      const r = tx.objectStore("names").get(String(addr).toLowerCase());
+      const box = {};
+      r.onsuccess = () => (box.value = r.result);
+      return box;
+    });
+    const v = rec?.value;
+    if (!v || typeof v.created != "number" || v.created > Date.now() + 6e4) return;
+    const age = Date.now() - v.created;
+    if (typeof v.name == "string" && /^[a-z0-9_-]+(\.[a-z0-9-]+)+$/.test(v.name) && v.name.length <= 64 && age < 864e5)
+      return v.name;
+    if (v.name === null && age < 36e5) return null;
+  },
+  async putName(addr, name) {
+    if (!wt.test(addr) || !(name === null || (typeof name == "string" && name.length <= 64))) return;
+    await this.run("names", "readwrite", (tx) => {
+      tx.objectStore("names").put({ key: addr.toLowerCase(), name, created: Date.now() });
+    });
+  },
   async clear() {
-    await this.run(["classes", "lists"], "readwrite", (tx) => {
+    await this.run(["classes", "lists", "names"], "readwrite", (tx) => {
       tx.objectStore("classes").clear();
       tx.objectStore("lists").clear();
+      tx.objectStore("names").clear();
     });
   },
 };
+globalThis.find3rNameCache = { get: (addr) => crossVisit.name(addr), put: (addr, name) => crossVisit.putName(addr, name) };
 const ABX_LIST_FRESH_MS = 36e5;
 var dn = class {
   constructor({ fetcher: t = (...n) => globalThis.fetch(...n), content: r = {} } = {}) {
@@ -6380,12 +6404,16 @@ function Fd() {
         );
       });
 }
+// A saved wallet whose label is just its address (full or shortened): names.js may append its ENS name.
+function unlabeledWallet(r) {
+  return r.kind === "wallet" && /^0x[0-9a-f]{40}$/i.test(r.value || "") && (!r.label || r.label === r.value || r.label === Nd(r.value));
+}
 function cr() {
   let e = (t) =>
     t
       .map((r) => {
         let n = he(r.deploymentId);
-        return `<button data-folder="${z(r.id)}" aria-current="${u.folder?.id === r.id || (r.kind === "wallet" && u.folder?.kind === "wallet" && Ho(r, u.folder))}" ${C ? "disabled" : ""}>${Cs(r.kind === "collection" ? "collection" : "location")}<span class="folder-text">${z(r.label)}<small>${q() ? (r.kind === "wallet" ? "Apps & artworks" : r.adapter ? le[r.adapter] + " collection" : "Apps & files") : r.kind === "wallet" ? "Wallet \xB7 " + (re[r.chainId] || "All chains") : `Collection \xB7 ${r.adapter ? le[r.adapter] : n?.chainId === 8453 ? "Base" : "Base Sepolia"}`}</small></span></button>`;
+        return `<button data-folder="${z(r.id)}" aria-current="${u.folder?.id === r.id || (r.kind === "wallet" && u.folder?.kind === "wallet" && Ho(r, u.folder))}" ${C ? "disabled" : ""}>${Cs(r.kind === "collection" ? "collection" : "location")}<span class="folder-text"><span class="folder-name"${unlabeledWallet(r) ? ` data-wallet="${z(r.value.toLowerCase())}"` : ""}>${z(r.label)}</span><small>${q() ? (r.kind === "wallet" ? "Apps & artworks" : r.adapter ? le[r.adapter] + " collection" : "Apps & files") : r.kind === "wallet" ? "Wallet \xB7 " + (re[r.chainId] || "All chains") : `Collection \xB7 ${r.adapter ? le[r.adapter] : n?.chainId === 8453 ? "Base" : "Base Sepolia"}`}</small></span></button>`;
       })
       .join("");
   p("#folders").innerHTML = ["wallet", "collection"]

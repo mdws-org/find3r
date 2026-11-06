@@ -75,12 +75,29 @@
         }
     }
 
+    // Names remembered across visits (app.js keeps them in its cache database, when allowed on this origin).
+    function stored(addr) {
+        var c = window.find3rNameCache;
+        if (!c) return Promise.resolve(undefined);
+        return Promise.resolve().then(function () { return c.get(addr); }).catch(function () { return undefined; });
+    }
+    function remember(addr, name) {
+        var c = window.find3rNameCache;
+        if (c) Promise.resolve().then(function () { return c.put(addr, name); }).catch(function () {});
+    }
+
     function nameFor(addr) {
         addr = addr.toLowerCase();
         if (!cache.has(addr)) {
-            if (started >= MAX_LOOKUPS) return Promise.resolve(null);
-            started++;
-            cache.set(addr, new Promise(function (done) { queue.push({ addr: addr, done: done }); pump(); }));
+            cache.set(addr, stored(addr).then(function (hit) {
+                if (hit !== undefined) return hit;
+                if (started >= MAX_LOOKUPS) return null;
+                started++;
+                return new Promise(function (done) { queue.push({ addr: addr, done: done }); pump(); }).then(function (name) {
+                    remember(addr, name);
+                    return name;
+                });
+            }));
         }
         return cache.get(addr);
     }
@@ -115,6 +132,10 @@
         document.querySelectorAll('dd').forEach(function (dd) {
             var t = ownText(dd), dt = dd.previousElementSibling;
             if (FULL.test(t) && !(dt && /contract/i.test(dt.textContent))) label(dd, t.toLowerCase());
+        });
+        // Saved wallets in the sidebar whose label is only their address (app.js marks them).
+        document.querySelectorAll('#folders [data-wallet]').forEach(function (el) {
+            if (FULL.test(el.dataset.wallet)) label(el, el.dataset.wallet.toLowerCase());
         });
         // Breadcrumb for an opened wallet: shortened address, full one in the URL.
         var full = hashAddress();
