@@ -11,7 +11,7 @@ function makeEnsResolver(ethCall, keccak256) {
     var UR = '0xeeeeeeee14d718c2b47d9923deab1335e144eeee';
     var GATEWAY = 'https://ccip-v3.ens.xyz';
     // Gateway origins fetched straight from the browser (exact match); anything else goes through ENS Labs.
-    var DIRECT = ['https://api.coinbase.com', 'https://ccip-v3.ens.xyz'];
+    var DIRECT = ['https://api.coinbase.com', 'https://ccip-v3.ens.xyz', 'https://dnssec-oracle.ens.domains'];
     var TIMEOUT_MS = 8000, MAX_HOPS = 4, MAX_REQS = 8, MAX_URLS = 4;
 
     function hex(b) { return Array.prototype.map.call(b, function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }
@@ -178,7 +178,8 @@ function makeEnsResolver(ethCall, keccak256) {
             if (s === '0x77209fe8') return n + ': not registered';
             if (s === '0x1e9535f2') return n + ': its resolver is not a contract';
             if (s === '0x7b1c461b') return null;
-            if (s === '0x95c0c752') return n + ': its resolver failed - try again later';
+            // ResolverError: the name's resolver declined, as DNS names with no ENS records do.
+            if (s === '0x95c0c752') return n + ': no address could be found for this name';
             if (/^0x[0-9a-f]{8}$/i.test(s)) return n + ': could not be resolved';
             return n + ': could not reach ENS - try again';
         }
