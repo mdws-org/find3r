@@ -13,9 +13,11 @@ html.dark {
 html.dark button {
   border-color: #27272a;
 }
-html.dark button:hover {
-  background-color: #000000;
-  border-color: #52525b;
+@media (hover: hover) {
+  html.dark button:hover {
+    background-color: #000000;
+    border-color: #52525b;
+  }
 }
 html.dark input:focus,
 html.dark textarea:focus {
@@ -24,9 +26,11 @@ html.dark textarea:focus {
 html.dark .primary {
   color: #000000;
 }
-html.dark .primary:hover {
-  background-color: #a3a3a3;
-  border-color: #a3a3a3;
+@media (hover: hover) {
+  html.dark .primary:hover {
+    background-color: #a3a3a3;
+    border-color: #a3a3a3;
+  }
 }
 html.dark .desktop-header > span {
   color: #737373;
@@ -100,8 +104,10 @@ html.dark .list-head {
 html.dark .item {
   border-bottom-color: #09090b;
 }
-html.dark .item:hover {
-  background-color: #000000;
+@media (hover: hover) {
+  html.dark .item:hover {
+    background-color: #000000;
+  }
 }
 html.dark .item-type,
 html.dark .item-meta {
@@ -178,9 +184,11 @@ html.dark .artwork-image-button {
   border-color: #09090b;
   background-color: #000000;
 }
-html.dark .artwork-image-button:hover {
-  background-color: #000000;
-  border-color: #27272a;
+@media (hover: hover) {
+  html.dark .artwork-image-button:hover {
+    background-color: #000000;
+    border-color: #27272a;
+  }
 }
 html.dark .artwork-info {
   border-left-color: #09090b;
@@ -188,8 +196,10 @@ html.dark .artwork-info {
 html.dark .artwork-artist {
   color: #737373;
 }
-html.dark .button-link:hover {
-  background-color: #a3a3a3;
+@media (hover: hover) {
+  html.dark .button-link:hover {
+    background-color: #a3a3a3;
+  }
 }
 html.dark .artwork-features {
   border-top-color: #09090b;
@@ -309,11 +319,17 @@ html.dark .async-dialog .image-dialog-bar {
 html.dark #async-stage {
   background-color: #09090b;
 }
-html.dark .primary,
-html.dark .primary:hover {
+html.dark .primary {
   background: #ffffff;
   border-color: #ffffff;
   color: #000000;
+}
+@media (hover: hover) {
+  html.dark .primary:hover {
+    background: #ffffff;
+    border-color: #ffffff;
+    color: #000000;
+  }
 }
 html.dark #theme-toggle::before {
   content: "Light";
@@ -333,9 +349,11 @@ html.dark #theme-toggle::before {
   html:not(.light) button {
     border-color: #27272a;
   }
-  html:not(.light) button:hover {
-    background-color: #000000;
-    border-color: #52525b;
+  @media (hover: hover) {
+    html:not(.light) button:hover {
+      background-color: #000000;
+      border-color: #52525b;
+    }
   }
   html:not(.light) input:focus,
   html:not(.light) textarea:focus {
@@ -344,9 +362,11 @@ html.dark #theme-toggle::before {
   html:not(.light) .primary {
     color: #000000;
   }
-  html:not(.light) .primary:hover {
-    background-color: #a3a3a3;
-    border-color: #a3a3a3;
+  @media (hover: hover) {
+    html:not(.light) .primary:hover {
+      background-color: #a3a3a3;
+      border-color: #a3a3a3;
+    }
   }
   html:not(.light) .desktop-header > span {
     color: #737373;
@@ -420,8 +440,10 @@ html.dark #theme-toggle::before {
   html:not(.light) .item {
     border-bottom-color: #09090b;
   }
-  html:not(.light) .item:hover {
-    background-color: #000000;
+  @media (hover: hover) {
+    html:not(.light) .item:hover {
+      background-color: #000000;
+    }
   }
   html:not(.light) .item-type,
   html:not(.light) .item-meta {
@@ -498,9 +520,11 @@ html.dark #theme-toggle::before {
     border-color: #09090b;
     background-color: #000000;
   }
-  html:not(.light) .artwork-image-button:hover {
-    background-color: #000000;
-    border-color: #27272a;
+  @media (hover: hover) {
+    html:not(.light) .artwork-image-button:hover {
+      background-color: #000000;
+      border-color: #27272a;
+    }
   }
   html:not(.light) .artwork-info {
     border-left-color: #09090b;
@@ -508,8 +532,10 @@ html.dark #theme-toggle::before {
   html:not(.light) .artwork-artist {
     color: #737373;
   }
-  html:not(.light) .button-link:hover {
-    background-color: #a3a3a3;
+  @media (hover: hover) {
+    html:not(.light) .button-link:hover {
+      background-color: #a3a3a3;
+    }
   }
   html:not(.light) .artwork-features {
     border-top-color: #09090b;
@@ -629,11 +655,17 @@ html.dark #theme-toggle::before {
   html:not(.light) #async-stage {
     background-color: #09090b;
   }
-  html:not(.light) .primary,
-  html:not(.light) .primary:hover {
+  html:not(.light) .primary {
     background: #ffffff;
     border-color: #ffffff;
     color: #000000;
+  }
+  @media (hover: hover) {
+    html:not(.light) .primary:hover {
+      background: #ffffff;
+      border-color: #ffffff;
+      color: #000000;
+    }
   }
   html:not(.light) #theme-toggle::before {
     content: "Light";

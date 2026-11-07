@@ -1,9 +1,2 @@
-# css-touch-lint (the push guard) arguments. app.css is upstream find3r's stylesheet, reformatted and
-# recoloured by tools/theme-fork.py, and theme-dark.css is generated from it (colour-only mirrors of the
-# same rules). Their hover-only affordances and sub-16px form controls are upstream's design and are a
-# post-launch item, not changed here. Everything else is linted.
+# css-touch-lint (the push guard) arguments: lint the whole tree.
 .
---exclude
-app.css
---exclude
-theme-dark.css
