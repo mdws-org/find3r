@@ -48,9 +48,11 @@ button {
   padding: 8px 13px;
   box-shadow: 0 1px 0 #00000009;
 }
-button:hover {
-  background: #ffffff;
-  border-color: #a1a1aa;
+@media (hover: hover) {
+  button:hover {
+    background: #ffffff;
+    border-color: #a1a1aa;
+  }
 }
 button:disabled {
   opacity: 0.45;
@@ -82,9 +84,11 @@ input:disabled {
   color: #ffffff;
   box-shadow: 0 1px 0 #3f3f46;
 }
-.primary:hover {
-  background: #52525b;
-  border-color: #52525b;
+@media (hover: hover) {
+  .primary:hover {
+    background: #52525b;
+    border-color: #52525b;
+  }
 }
 button.primary span {
   margin-left: 12px;
@@ -188,9 +192,11 @@ button.primary span {
   text-decoration: none;
   font-size: 12px;
 }
-.menubar button:hover,
-.menubar a:hover {
-  color: var(--blue);
+@media (hover: hover) {
+  .menubar button:hover,
+  .menubar a:hover {
+    color: var(--blue);
+  }
 }
 #connection {
   margin-left: auto;
@@ -221,6 +227,7 @@ button.primary span {
   color: var(--muted);
   white-space: nowrap;
 }
+/* css-touch-lint: allow (16px under the first pointer: coarse block) */
 .addressbar input {
   flex: 1;
   min-width: 0;
@@ -278,6 +285,7 @@ button.primary span {
   align-items: center;
   gap: 6px;
 }
+/* css-touch-lint: allow (16px under pointer: coarse at the end of this file) */
 .sort select {
   padding: 4px 6px;
   font-size: 11px;
@@ -439,8 +447,10 @@ aside {
   background: transparent;
   min-height: 63px;
 }
-.item:hover {
-  background: #ffffff;
+@media (hover: hover) {
+  .item:hover {
+    background: #ffffff;
+  }
 }
 .item[aria-pressed="true"] {
   background: var(--selected);
@@ -1035,6 +1045,7 @@ textarea {
   color: var(--muted);
   white-space: nowrap;
 }
+/* css-touch-lint: allow (16px under pointer: coarse at the end of this file) */
 .mode-switch select {
   padding: 4px 6px;
   font-size: 11px;
@@ -1214,9 +1225,11 @@ textarea {
   box-shadow: none;
   cursor: zoom-in;
 }
-.artwork-image-button:hover {
-  background: #ffffff;
-  border-color: #e4e4e7;
+@media (hover: hover) {
+  .artwork-image-button:hover {
+    background: #ffffff;
+    border-color: #e4e4e7;
+  }
 }
 .artwork-image-button img {
   width: 100%;
@@ -1264,8 +1277,10 @@ textarea {
   text-decoration: none;
   font-size: 12px;
 }
-.button-link:hover {
-  background: #52525b;
+@media (hover: hover) {
+  .button-link:hover {
+    background: #52525b;
+  }
 }
 .button-link[aria-disabled="true"] {
   opacity: 0.45;
@@ -1779,9 +1794,13 @@ textarea {
   font-size: 12px;
   opacity: 0.5;
 }
-.live-back:hover,
 .live-back:focus {
   opacity: 1;
+}
+@media (hover: hover) {
+  .live-back:hover {
+    opacity: 1;
+  }
 }
 #live-status {
   position: relative;
@@ -1889,6 +1908,7 @@ textarea {
   white-space: nowrap;
   font-size: 12px;
 }
+/* css-touch-lint: allow (16px under pointer: coarse at the end of this file) */
 .chain-picker select {
   font-size: 13px;
   padding: 8px;
@@ -2023,11 +2043,17 @@ body {
 * {
   box-shadow: none !important;
 }
-.primary,
-.primary:hover {
+.primary {
   background: #000000;
   border-color: #000000;
   color: #ffffff;
+}
+@media (hover: hover) {
+  .primary:hover {
+    background: #000000;
+    border-color: #000000;
+    color: #ffffff;
+  }
 }
 .wordmark span {
   color: inherit;
@@ -2063,5 +2089,19 @@ body {
   }
   .learn-body > .fork-banner {
     margin: -24px -24px 16px;
+  }
+}
+
+/* Touch screens. Last in the file so it outranks the compact desktop sizes above, which are as specific as these selectors. */
+@media (pointer: coarse) {
+  .sort select,
+  .mode-switch select,
+  .chain-picker select {
+    font-size: 16px;
+  }
+}
+@media (hover: none) {
+  .live-back {
+    opacity: 1;
   }
 }
