@@ -1,4 +1,6 @@
 # The viewer rewrites its address to a public app route once an app is open; these routes serve viewer.html
 # (a rewrite, status 200), so a reload or a shared link opens the same app. Same mapping as find3r.app.
-/app/* /viewer.html 200
-/app-full/* /viewer.html 200
+# The target is the extensionless form: Pages serves every page without its .html and redirects the .html
+# address to it, and a rewrite to viewer.html would be turned into that redirect, losing the route.
+/app/* /viewer 200
+/app-full/* /viewer 200

@@ -38,3 +38,23 @@
 
 /artwork.html
   Content-Security-Policy: frame-ancestors 'none'
+
+# Pages serves each page at its extensionless address as well and redirects the .html form to it,
+# so every page rule exists in both spellings.
+/index
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; font-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+/gateway
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data: blob:; font-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+/learn
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+/changes
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+/viewer
+  Content-Security-Policy: frame-ancestors 'none'
+
+/artwork
+  Content-Security-Policy: frame-ancestors 'none'
