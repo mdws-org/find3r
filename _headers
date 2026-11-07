@@ -1,0 +1,40 @@
+# Response headers for find3r.thebenmeadows.com (Cloudflare Pages format).
+#
+# Every file revalidates on each load, as find3r.app does, so a new deploy is picked up at once.
+# The content-security policy is set only on pages that never host untrusted content. viewer.html
+# and artwork.html open published apps and live views in sandboxed srcdoc frames, and a frame
+# created that way inherits its parent's policy, so those two pages carry no script-src.
+
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+
+/
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; font-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+/index.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; font-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+/gateway.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data: blob:; font-src 'self'; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+/learn.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+/changes.html
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'
+
+/viewer.html
+  Content-Security-Policy: frame-ancestors 'none'
+
+# The viewer's public routes (served as viewer.html through _redirects).
+/app/*
+  Content-Security-Policy: frame-ancestors 'none'
+
+/app-full/*
+  Content-Security-Policy: frame-ancestors 'none'
+
+/artwork.html
+  Content-Security-Policy: frame-ancestors 'none'
