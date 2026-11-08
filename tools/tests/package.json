@@ -1,0 +1,9 @@
+{
+  "name": "find3r-browser-checks",
+  "private": true,
+  "type": "module",
+  "description": "Browser checks for the find3r fork: headless Chromium through playwright-core, run by hand against a served copy.",
+  "devDependencies": {
+    "playwright-core": "1.63.0"
+  }
+}
