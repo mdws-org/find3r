@@ -21,7 +21,9 @@ async function check(label, page, work) {
     const csp = await page.evaluate(() => window.__csp).catch(() => ['(could not read)']);
     const frames = page.frames().length - 1;
     const hdr = Object.entries(docHeaders).map(([p, h]) => `${p}: csp=${h['content-security-policy'] ? 'yes' : 'no'} cache=${h['cache-control'] || '-'} xfo=${h['x-frame-options'] || '-'} nosniff=${h['x-content-type-options'] || '-'}`).join('; ');
-    const ok = csp.length === 0 && errors.length === 0;
+    // A stylesheet or script the browser refused (wrong type, usually a rewrite answering with a page) fails too.
+    const refused = console_.filter((x) => /Refused to (apply style|execute script)/.test(x));
+    const ok = csp.length === 0 && errors.length === 0 && refused.length === 0;
     bad += !ok;
     console.log(`${ok ? 'ok ' : 'ERR'} ${label}: ${csp.length} CSP violation(s), ${errors.length} page error(s), ${frames} child frame(s); ${hdr}`);
     for (const v of csp) console.log('     CSP ' + v);
