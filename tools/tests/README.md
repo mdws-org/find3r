@@ -28,6 +28,7 @@ node tools/tests/headers-serve.mjs . 8840
 | `artwork-check.mjs` | The artwork page uses the same class re-check and still shows the artwork | `node artwork-check.mjs <base url> <chain> <contract> <token>` |
 | `names-toggle.mjs` | The Settings switch for ENS names removes and restores labels and stops reverse lookups while off | `node names-toggle.mjs <base url> <wallet or ENS name>` |
 | `names-offon.mjs` | Turning names off and on without a re-render labels the same element again | `node names-offon.mjs <artwork page url>` |
+| `learn-measure.mjs` | The help page keeps the thebenmeadows.com reading measure: 16px text, median line at most 75 characters, none over 85, nothing justified on a phone | `node learn-measure.mjs http://127.0.0.1:8840/` |
 | `headers-serve.mjs` | Not a check: the static server above | |
 
 Each check prints PASS or FAIL lines and exits 1 on a failure. The class and names checks read live chains through the public RPCs and ENS, so they need a network connection and real contract or wallet addresses.

@@ -53,6 +53,29 @@ body {
 #theme-toggle::before {
   content: "Dark";
 }
+/* thebenmeadows.com reading measure on the help page: 16px text in a 560px
+   column (about 66 characters a line), headings balanced. The app's own
+   window UI is unchanged. In px because the app sets its root to 14px. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+.learn {
+  max-width: 560px;
+  font-size: 16px;
+}
+.learn p,
+.learn li {
+  line-height: 1.6;
+}
+.learn code {
+  font-size: 0.875em;
+}
+.learn h1,
+.learn h2,
+.learn h3 {
+  text-wrap: balance;
+}
 """
 DARK_EXTRA = """
 .primary,
